@@ -22,11 +22,11 @@ cp config/workspace.yaml.example config/workspace.yaml
 # 3. Build the container
 ./claude-dev build
 
-# 4. Start in develop mode
-./claude-dev start
+# 4. Start a named session
+./claude-dev start my-feature
 
 # 5. Attach to Claude Code
-./claude-dev attach
+./claude-dev attach my-feature
 ```
 
 ## Built-in Skills (gstack)
@@ -52,10 +52,10 @@ gstack skills are available in both Develop and PR Review modes.
 Interactive mode — you attach to the container and use Claude Code directly with full TTY formatting. All gstack skills are available.
 
 ```bash
-./claude-dev start --mode=develop
-./claude-dev attach
+./claude-dev start my-feature
+./claude-dev attach my-feature
 # Optionally with --dangerously-skip-permissions:
-./claude-dev attach --skip-permissions
+./claude-dev attach my-feature --skip-permissions
 ```
 
 ### PR Review
@@ -64,13 +64,27 @@ One-shot mode — reviews a PR using gstack's `/review` skill and outputs commen
 
 ```bash
 # Dry-run (default): outputs review to file for you to inspect
-./claude-dev run --mode=pr-review --pr=123
+./claude-dev run pr-review-123 --mode=pr-review --pr=123
 
 # Auto-post to GitHub:
-./claude-dev run --mode=pr-review --pr=org/repo#123 --no-dry-run
+./claude-dev run pr-review-456 --mode=pr-review --pr=org/repo#456 --no-dry-run
 
 # Post a saved dry-run review:
-./claude-dev pr-submit
+./claude-dev pr-submit pr-review-123
+```
+
+### Multiple Sessions
+
+Each session has its own name, container, and workspace volume. Run as many as you need:
+
+```bash
+./claude-dev start feature-auth
+./claude-dev start bugfix-nav
+./claude-dev list                      # see all sessions
+./claude-dev attach feature-auth       # attach to a specific one
+./claude-dev stop bugfix-nav           # stop (preserves state)
+./claude-dev start bugfix-nav          # restart a stopped session
+./claude-dev delete bugfix-nav         # permanently remove
 ```
 
 ## Configuration
@@ -131,11 +145,12 @@ The container mounts your host `~/.claude.json` read-only. API keys, base URL (e
 | Command | Description |
 |---------|-------------|
 | `./claude-dev build` | Build the container image |
-| `./claude-dev start [--mode=MODE]` | Start the container |
-| `./claude-dev attach` | Attach to Claude Code interactively |
-| `./claude-dev run --mode=pr-review --pr=REF` | Run one-shot PR review |
-| `./claude-dev pr-submit` | Post saved review to GitHub |
-| `./claude-dev status` | Show session status |
-| `./claude-dev logs` | Tail session log |
-| `./claude-dev stop` | Stop the container |
-| `./claude-dev clean` | Stop and remove volumes |
+| `./claude-dev start <name>` | Start a new session (or restart a stopped one) |
+| `./claude-dev attach <name>` | Attach to a running session |
+| `./claude-dev run <name> --mode=pr-review --pr=REF` | Run one-shot PR review |
+| `./claude-dev pr-submit <name>` | Post saved review to GitHub |
+| `./claude-dev status <name>` | Show session status |
+| `./claude-dev logs <name>` | Tail session log |
+| `./claude-dev stop <name>` | Stop session (preserves state for restart) |
+| `./claude-dev delete <name>` | Permanently remove session and its data |
+| `./claude-dev list` | List all sessions |

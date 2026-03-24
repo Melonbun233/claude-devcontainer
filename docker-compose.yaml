@@ -1,9 +1,14 @@
 services:
   claude-dev:
     build: .
-    container_name: claude-dev
+    image: claude-devcontainer:latest
+    container_name: ${CONTAINER_NAME:-claude-dev}
+    labels:
+      com.claude-dev.session: "true"
     environment:
       - MODE=${MODE:-develop}
+      - SESSION_NAME=${SESSION_NAME:-default}
+      - CONTAINER_NAME=${CONTAINER_NAME:-claude-dev}
       # Anthropic / LLM Proxy
       - ANTHROPIC_BASE_URL
       - ANTHROPIC_AUTH_TOKEN
@@ -48,3 +53,4 @@ services:
 
 volumes:
   workspace:
+    name: ${VOLUME_NAME:-claude-dev-workspace}

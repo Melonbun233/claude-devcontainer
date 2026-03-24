@@ -13,12 +13,14 @@ if [ ! -f "$STATUS_FILE" ]; then
 fi
 
 MODE=$(jq -r '.mode // "unknown"' "$STATUS_FILE")
+SESSION=$(jq -r '.session_name // "unknown"' "$STATUS_FILE")
 STARTED=$(jq -r '.started_at // "unknown"' "$STATUS_FILE")
 CONTAINER=$(jq -r '.container_id // "unknown"' "$STATUS_FILE")
 
 echo "┌──────────────────────────────────────────────┐"
 echo "│  Session Status                              │"
 echo "├──────────────────────────────────────────────┤"
+echo "│  Session:   $(printf '%-33s' "$SESSION")│"
 echo "│  Mode:      $(printf '%-33s' "$MODE")│"
 echo "│  Started:   $(printf '%-33s' "$STARTED")│"
 echo "│  Container: $(printf '%-33s' "$CONTAINER")│"

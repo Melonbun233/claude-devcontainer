@@ -3,10 +3,12 @@ set -euo pipefail
 
 # ── Banner ───────────────────────────────────────────────────────────────────
 MODE="${MODE:-develop}"
+SESSION_NAME="${SESSION_NAME:-default}"
 echo "┌──────────────────────────────────────────────┐"
 echo "│  claude-devcontainer                         │"
-echo "│  Mode: $(printf '%-38s' "$MODE")│"
-echo "│  Time: $(printf '%-38s' "$(date -u +%Y-%m-%dT%H:%M:%SZ)")│"
+echo "│  Session: $(printf '%-34s' "$SESSION_NAME")│"
+echo "│  Mode:    $(printf '%-34s' "$MODE")│"
+echo "│  Time:    $(printf '%-34s' "$(date -u +%Y-%m-%dT%H:%M:%SZ)")│"
 echo "└──────────────────────────────────────────────┘"
 echo ""
 
@@ -75,6 +77,7 @@ mkdir -p "$SESSION_DIR"
 
 cat > "$SESSION_DIR/status.json" <<EOF
 {
+  "session_name": "$SESSION_NAME",
   "mode": "$MODE",
   "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "container_id": "$(hostname)"

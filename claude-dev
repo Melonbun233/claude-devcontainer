@@ -4,47 +4,78 @@ set -euo pipefail
 # ── claude-dev — CLI wrapper for claude-devcontainer ─────────────────────────
 
 COMPOSE="docker compose"
-CONTAINER="claude-dev"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 cd "$SCRIPT_DIR"
 
 usage() {
   cat <<'EOF'
-Usage: claude-dev <command> [options]
+Usage: claude-dev <command> <session-name> [options]
+
+A session name is required for all commands (except build, list, help).
 
 Commands:
-  build                              Build the container image
-  start [--mode=develop]             Start the container
-  attach [--skip-permissions]        Attach to running container with Claude Code
-  run --mode=pr-review --pr=<ref>    Run a one-shot PR review
-  pr-submit                          Post the last dry-run review to GitHub
-  status                             Show session status
-  logs                               Tail session output log
-  stop                               Stop the container
-  clean                              Stop and remove volumes
+  build                                Build the container image
+  start <name> [--mode=develop]        Start a new session
+  attach <name> [--skip-permissions]   Attach to a running session
+  run <name> --mode=pr-review --pr=REF Run a one-shot PR review
+  pr-submit <name>                     Post the last dry-run review to GitHub
+  status <name>                        Show session status
+  logs <name>                          Tail session output log
+  stop <name>                          Stop session (can be restarted later)
+  delete <name>                        Permanently remove session and its data
+  list                                 List all sessions
 
 PR Review options:
-  --pr=<number|org/repo#number>      PR to review (required)
-  --no-dry-run                       Post review directly to GitHub
+  --pr=<number|org/repo#number>        PR to review (required)
+  --no-dry-run                         Post review directly to GitHub
 
 Examples:
   claude-dev build
-  claude-dev start
-  claude-dev attach
-  claude-dev start --mode=pr-review --pr=123
-  claude-dev run --mode=pr-review --pr=myorg/myrepo#456
-  claude-dev run --mode=pr-review --pr=123 --no-dry-run
-  claude-dev pr-submit
-  claude-dev status
-  claude-dev stop
+  claude-dev start my-feature
+  claude-dev attach my-feature
+  claude-dev start pr-review-123 --mode=pr-review --pr=123
+  claude-dev run review-456 --mode=pr-review --pr=org/repo#456 --no-dry-run
+  claude-dev stop my-feature
+  claude-dev start my-feature              # restart a stopped session
+  claude-dev delete my-feature             # permanently remove
+  claude-dev list
 EOF
 }
 
-# ── Parse arguments ──────────────────────────────────────────────────────────
+# ── Parse command ────────────────────────────────────────────────────────────
 COMMAND="${1:-}"
 shift || true
 
+# Commands that don't need a session name
+case "$COMMAND" in
+  build|list|help|--help|-h|"")
+    # handled below without session name
+    ;;
+  *)
+    # All other commands require a session name as first argument
+    SESSION_NAME="${1:-}"
+    if [ -z "$SESSION_NAME" ]; then
+      echo "ERROR: Session name is required."
+      echo ""
+      echo "  Usage: claude-dev $COMMAND <session-name> [options]"
+      echo ""
+      echo "  Example: claude-dev $COMMAND my-feature"
+      exit 1
+    fi
+    shift
+    ;;
+esac
+
+# ── Derive container/volume names from session name ─────────────────────────
+if [ -n "${SESSION_NAME:-}" ]; then
+  CONTAINER_NAME="claude-dev-${SESSION_NAME}"
+  VOLUME_NAME="claude-dev-workspace-${SESSION_NAME}"
+  COMPOSE="$COMPOSE --project-name claude-dev-${SESSION_NAME}"
+  export CONTAINER_NAME SESSION_NAME VOLUME_NAME
+fi
+
+# ── Parse remaining options ─────────────────────────────────────────────────
 MODE=""
 PR_REF=""
 DRY_RUN="true"
@@ -62,6 +93,15 @@ while [ $# -gt 0 ]; do
   shift
 done
 
+# ── Helper: check if container exists / is running ──────────────────────────
+container_exists() {
+  docker container inspect "$CONTAINER_NAME" &>/dev/null
+}
+
+container_running() {
+  [ "$(docker container inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null)" = "true" ]
+}
+
 # ── Commands ─────────────────────────────────────────────────────────────────
 
 case "$COMMAND" in
@@ -72,29 +112,59 @@ case "$COMMAND" in
   start)
     MODE="${MODE:-develop}"
     export MODE
-    if [ -n "$PR_REF" ]; then
-      export PR_NUMBER="$PR_REF"
+
+    # Check if session is already running
+    if container_running; then
+      echo "ERROR: Session '$SESSION_NAME' is already running."
+      echo ""
+      echo "  To attach:  ./claude-dev attach $SESSION_NAME"
+      echo "  To stop:    ./claude-dev stop $SESSION_NAME"
+      exit 1
     fi
-    export DRY_RUN
-    export SKIP_PERMISSIONS
-    $COMPOSE up -d
+
+    # Check if a stopped container exists — restart it
+    if container_exists; then
+      echo ":: Restarting stopped session '$SESSION_NAME'..."
+      docker start "$CONTAINER_NAME"
+    else
+      if [ -n "$PR_REF" ]; then
+        export PR_NUMBER="$PR_REF"
+      fi
+      export DRY_RUN SKIP_PERMISSIONS
+      $COMPOSE up -d
+    fi
+
     echo ""
     if [ "$MODE" = "develop" ]; then
-      echo "Container started in develop mode."
-      echo "Attach with:  ./claude-dev attach"
+      echo "Session '$SESSION_NAME' started in develop mode."
+      echo "Attach with:  ./claude-dev attach $SESSION_NAME"
     else
-      echo "Container started in $MODE mode."
-      echo "Check status: ./claude-dev status"
-      echo "View logs:    ./claude-dev logs"
+      echo "Session '$SESSION_NAME' started in $MODE mode."
+      echo "Check status: ./claude-dev status $SESSION_NAME"
+      echo "View logs:    ./claude-dev logs $SESSION_NAME"
     fi
     ;;
 
   attach)
+    if ! container_running; then
+      if container_exists; then
+        echo "ERROR: Session '$SESSION_NAME' is stopped."
+        echo ""
+        echo "  To restart: ./claude-dev start $SESSION_NAME"
+        exit 1
+      else
+        echo "ERROR: Session '$SESSION_NAME' does not exist."
+        echo ""
+        echo "  To create:  ./claude-dev start $SESSION_NAME"
+        echo "  To list:    ./claude-dev list"
+        exit 1
+      fi
+    fi
     CLAUDE_ARGS=""
     if [ "$SKIP_PERMISSIONS" = "true" ]; then
       CLAUDE_ARGS="--dangerously-skip-permissions"
     fi
-    docker exec -it "$CONTAINER" claude $CLAUDE_ARGS
+    docker exec -it "$CONTAINER_NAME" claude $CLAUDE_ARGS
     ;;
 
   run)
@@ -104,38 +174,91 @@ case "$COMMAND" in
       exit 1
     fi
     export MODE PR_NUMBER="$PR_REF" DRY_RUN SKIP_PERMISSIONS
-    $COMPOSE run --rm "$CONTAINER"
+    $COMPOSE run --rm --name "$CONTAINER_NAME" claude-dev
     ;;
 
   pr-submit)
     REVIEW_FILE="/workspace/.claude-session/review.md"
-    # Read PR number from session status
-    PR_NUMBER=$(docker exec "$CONTAINER" jq -r '.pr_number // empty' /workspace/.claude-session/status.json 2>/dev/null || true)
+    PR_NUMBER=$(docker exec "$CONTAINER_NAME" jq -r '.pr_number // empty' /workspace/.claude-session/status.json 2>/dev/null || true)
 
     if [ -z "$PR_NUMBER" ]; then
-      echo "ERROR: No PR number found in session. Run a PR review first."
+      echo "ERROR: No PR number found in session '$SESSION_NAME'. Run a PR review first."
       exit 1
     fi
 
     echo "Posting review to PR #$PR_NUMBER..."
-    docker exec "$CONTAINER" sh -c "gh pr review $PR_NUMBER --comment --body \"\$(cat $REVIEW_FILE)\""
+    docker exec "$CONTAINER_NAME" sh -c "gh pr review $PR_NUMBER --comment --body \"\$(cat $REVIEW_FILE)\""
     echo "Review posted."
     ;;
 
   status)
-    docker exec "$CONTAINER" /scripts/monitor.sh
+    if ! container_exists; then
+      echo "ERROR: Session '$SESSION_NAME' does not exist."
+      exit 1
+    fi
+    if container_running; then
+      docker exec "$CONTAINER_NAME" /scripts/monitor.sh
+    else
+      echo "Session '$SESSION_NAME' is stopped."
+      echo ""
+      echo "  To restart: ./claude-dev start $SESSION_NAME"
+      echo "  To delete:  ./claude-dev delete $SESSION_NAME"
+    fi
     ;;
 
   logs)
-    docker exec "$CONTAINER" tail -f /workspace/.claude-session/output.log
+    if ! container_running; then
+      echo "ERROR: Session '$SESSION_NAME' is not running."
+      exit 1
+    fi
+    docker exec "$CONTAINER_NAME" tail -f /workspace/.claude-session/output.log
     ;;
 
   stop)
-    $COMPOSE down
+    if ! container_exists; then
+      echo "ERROR: Session '$SESSION_NAME' does not exist."
+      exit 1
+    fi
+    docker stop "$CONTAINER_NAME" >/dev/null
+    echo "Session '$SESSION_NAME' stopped."
+    echo ""
+    echo "  To restart: ./claude-dev start $SESSION_NAME"
+    echo "  To delete:  ./claude-dev delete $SESSION_NAME"
     ;;
 
-  clean)
-    $COMPOSE down -v
+  delete)
+    if ! container_exists; then
+      echo "ERROR: Session '$SESSION_NAME' does not exist."
+      echo ""
+      echo "  To list sessions: ./claude-dev list"
+      exit 1
+    fi
+    # Stop if running
+    if container_running; then
+      docker stop "$CONTAINER_NAME" >/dev/null
+    fi
+    # Remove container
+    docker rm "$CONTAINER_NAME" >/dev/null
+    # Remove volume
+    if docker volume inspect "$VOLUME_NAME" &>/dev/null; then
+      docker volume rm "$VOLUME_NAME" >/dev/null
+    fi
+    echo "Session '$SESSION_NAME' permanently deleted."
+    ;;
+
+  list)
+    FORMAT="table {{.Names}}\t{{.Status}}\t{{.Label \"com.claude-dev.session\"}}"
+    echo "Sessions:"
+    echo ""
+    docker ps -a --filter "label=com.claude-dev.session=true" \
+      --format "table {{.Names}}\t{{.Status}}" 2>/dev/null || true
+    # Show if empty
+    COUNT=$(docker ps -a --filter "label=com.claude-dev.session=true" -q 2>/dev/null | wc -l | tr -d ' ')
+    if [ "$COUNT" = "0" ]; then
+      echo "  (no sessions)"
+      echo ""
+      echo "  To start one: ./claude-dev start <session-name>"
+    fi
     ;;
 
   help|--help|-h)
