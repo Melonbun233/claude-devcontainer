@@ -141,8 +141,8 @@ Mount your custom CLAUDE.md, agents, skills, and settings by placing them in `ho
 
 ```
 host-config/
-├── CLAUDE.md              # Global instructions
-├── settings.json          # Global settings
+├── CLAUDE.md              # Appended to built-in instructions
+├── settings.json          # Merged with built-in defaults
 ├── agents/                # Global agents
 ├── skills/                # Global skills
 └── repos/
@@ -151,6 +151,10 @@ host-config/
         ├── agents/
         └── skills/
 ```
+
+The container ships with a built-in `CLAUDE.md` (GitHub, Jira, gstack, superpowers instructions) and `settings.json` (permissions allowlist). Your host config is layered on top:
+- **CLAUDE.md**: host content is **appended** to the built-in (both are preserved)
+- **settings.json**: host values are **merged** with built-in defaults (host wins on conflicts)
 
 ### Anthropic Config
 
