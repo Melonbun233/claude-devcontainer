@@ -4,6 +4,10 @@ services:
     container_name: claude-dev
     environment:
       - MODE=${MODE:-develop}
+      # Anthropic / LLM Proxy
+      - ANTHROPIC_BASE_URL
+      - ANTHROPIC_AUTH_TOKEN
+      - ANTHROPIC_API_KEY
       # GitHub (add more token vars as needed, referenced by workspace.yaml)
       - GH_TOKEN
       - GH_ENTERPRISE_TOKEN
@@ -26,8 +30,10 @@ services:
       - NO_PROXY
       - NODE_EXTRA_CA_CERTS
     volumes:
-      # Host Anthropic config (API keys, base URL, auth tokens)
-      - ${HOME}/.claude.json:/home/claude/.claude.json:ro
+      # Host Anthropic config (staged, then copied+modified by entrypoint)
+      - ${HOME}/.claude.json:/tmp/.claude.json.host:ro
+      # Host Claude settings (contains auth tokens, base URL, model config)
+      - ${HOME}/.claude/settings.json:/tmp/.claude.settings.host:ro
       # Host-provided CLAUDE.md, agents, skills, settings
       - ./host-config:/host-config:ro
       # Persistent workspace for cloned repos

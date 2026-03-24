@@ -21,6 +21,42 @@ case "$MODE" in
 esac
 
 # ── Setup scripts ────────────────────────────────────────────────────────────
+
+# Copy host Anthropic config and pre-accept /workspace trust.
+# Host file is mounted read-only at /tmp/.claude.json.host; we copy and patch it.
+echo ":: Setting up Anthropic config..."
+CLAUDE_JSON="$HOME/.claude.json"
+HOST_CLAUDE_JSON="/tmp/.claude.json.host"
+
+if [ -f "$HOST_CLAUDE_JSON" ]; then
+  jq '.projects["/workspace"] //= {} | .projects["/workspace"].hasTrustDialogAccepted = true | .hasCompletedOnboarding = true' \
+    "$HOST_CLAUDE_JSON" > "$CLAUDE_JSON"
+  echo "  Host config copied with /workspace trust pre-accepted."
+else
+  echo '{"hasCompletedOnboarding":true,"projects":{"/workspace":{"hasTrustDialogAccepted":true}}}' | jq . > "$CLAUDE_JSON"
+  echo "  No host config found. Created minimal config with /workspace trust."
+fi
+
+# Copy host Claude settings.json (contains auth, base URL, model config).
+# Rewrite localhost → host.docker.internal so the container can reach host proxy.
+echo ":: Setting up Claude settings..."
+CLAUDE_SETTINGS="$HOME/.claude/settings.json"
+HOST_SETTINGS="/tmp/.claude.settings.host"
+
+if [ -f "$HOST_SETTINGS" ]; then
+  jq '
+    if .env.ANTHROPIC_BASE_URL then
+      .env.ANTHROPIC_BASE_URL = (.env.ANTHROPIC_BASE_URL
+        | gsub("localhost"; "host.docker.internal")
+        | gsub("127\\.0\\.0\\.1"; "host.docker.internal"))
+    else . end
+  ' "$HOST_SETTINGS" > "$CLAUDE_SETTINGS"
+  BASE_URL=$(jq -r '.env.ANTHROPIC_BASE_URL // "not set"' "$CLAUDE_SETTINGS")
+  echo "  Host settings copied. API base URL: $BASE_URL"
+else
+  echo "  No host settings.json found."
+fi
+
 echo ":: Setting up GitHub..."
 /scripts/setup-github.sh || echo "WARN: GitHub setup had issues (continuing)"
 
