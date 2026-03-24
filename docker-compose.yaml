@@ -16,8 +16,6 @@ services:
       # GitHub (add more token vars as needed, referenced by workspace.yaml)
       - GH_TOKEN
       - GH_ENTERPRISE_TOKEN
-      - GIT_USER_NAME
-      - GIT_USER_EMAIL
       # Jira
       - JIRA_URL
       - JIRA_USERNAME

@@ -59,8 +59,6 @@ entrypoint.sh
 | `MODE` | No | `develop` (default) or `pr-review` |
 | `GH_TOKEN` | For GitHub.com | GitHub.com PAT |
 | `GH_ENTERPRISE_TOKEN` | For GHE | Enterprise server PAT (name in workspace.yaml) |
-| `GIT_USER_NAME` | No | Git commit author name |
-| `GIT_USER_EMAIL` | No | Git commit author email |
 | `JIRA_URL` | For Jira | Jira instance URL |
 | `JIRA_USERNAME` | For Jira Cloud | Email for Cloud, username for DC |
 | `JIRA_API_TOKEN` | For Jira | API token (Cloud) or PAT (DC) |
