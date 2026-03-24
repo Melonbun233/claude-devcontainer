@@ -40,13 +40,5 @@ done
 # Configure git credential helper for all authenticated hosts
 gh auth setup-git 2>/dev/null || true
 
-# Git identity
-if [ -n "${GIT_USER_NAME:-}" ]; then
-  git config --global user.name "$GIT_USER_NAME"
-fi
-if [ -n "${GIT_USER_EMAIL:-}" ]; then
-  git config --global user.email "$GIT_USER_EMAIL"
-fi
-
 echo "  GitHub auth status:"
 gh auth status 2>&1 | sed 's/^/    /' || true
