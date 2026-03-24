@@ -25,22 +25,166 @@ Commands:
   stop <name>                          Stop session (can be restarted later)
   delete <name>                        Permanently remove session and its data
   list                                 List all sessions
+  help [command]                       Show help for a command
 
-PR Review options:
-  --pr=<number|org/repo#number>        PR to review (required)
-  --no-dry-run                         Post review directly to GitHub
+Run 'claude-dev help <command>' for detailed help on a specific command.
+EOF
+}
+
+command_help() {
+  case "${1:-}" in
+    build)
+      cat <<'EOF'
+Usage: claude-dev build
+
+Build (or rebuild) the container image. Run this after pulling updates
+or modifying the Dockerfile.
 
 Examples:
   claude-dev build
+EOF
+      ;;
+    start)
+      cat <<'EOF'
+Usage: claude-dev start <session-name> [options]
+
+Start a new session or restart a stopped one. Each session gets its own
+container and persistent workspace volume.
+
+Options:
+  --mode=<mode>         Mode to run: develop (default) or pr-review
+  --skip-permissions    Enable --dangerously-skip-permissions
+  --pr=<ref>            PR number for pr-review mode
+
+If the session was previously stopped, it is restarted with its existing
+workspace data intact.
+
+Examples:
   claude-dev start my-feature
+  claude-dev start my-feature --mode=develop
+  claude-dev start review-123 --mode=pr-review --pr=123
+EOF
+      ;;
+    attach)
+      cat <<'EOF'
+Usage: claude-dev attach <session-name> [options]
+
+Attach to a running session interactively with Claude Code.
+
+Options:
+  --skip-permissions    Enable --dangerously-skip-permissions
+
+The session must be running. If stopped, use 'start' to restart it first.
+
+Examples:
   claude-dev attach my-feature
-  claude-dev start pr-review-123 --mode=pr-review --pr=123
+  claude-dev attach my-feature --skip-permissions
+EOF
+      ;;
+    run)
+      cat <<'EOF'
+Usage: claude-dev run <session-name> --mode=pr-review --pr=<ref> [options]
+
+Run a one-shot task (e.g., PR review) and exit. The container is removed
+after completion.
+
+Options:
+  --mode=<mode>         Mode to run (default: pr-review)
+  --pr=<ref>            PR number or org/repo#number (required for pr-review)
+  --no-dry-run          Post review directly to GitHub instead of saving to file
+
+Examples:
+  claude-dev run review-123 --mode=pr-review --pr=123
   claude-dev run review-456 --mode=pr-review --pr=org/repo#456 --no-dry-run
+EOF
+      ;;
+    pr-submit)
+      cat <<'EOF'
+Usage: claude-dev pr-submit <session-name>
+
+Post a saved dry-run review to GitHub. The session must have a completed
+PR review saved in /workspace/.claude-session/review.md.
+
+Examples:
+  claude-dev pr-submit review-123
+EOF
+      ;;
+    status)
+      cat <<'EOF'
+Usage: claude-dev status <session-name>
+
+Show session status including mode, start time, and container info.
+For stopped sessions, shows restart/delete instructions.
+
+Examples:
+  claude-dev status my-feature
+EOF
+      ;;
+    logs)
+      cat <<'EOF'
+Usage: claude-dev logs <session-name>
+
+Tail the session output log. The session must be running.
+
+Examples:
+  claude-dev logs my-feature
+EOF
+      ;;
+    stop)
+      cat <<'EOF'
+Usage: claude-dev stop <session-name>
+
+Stop a running session. The container and workspace volume are preserved,
+so you can restart it later with 'start'.
+
+Examples:
   claude-dev stop my-feature
-  claude-dev start my-feature              # restart a stopped session
-  claude-dev delete my-feature             # permanently remove
+  claude-dev start my-feature    # restart later
+EOF
+      ;;
+    delete)
+      cat <<'EOF'
+Usage: claude-dev delete <session-name>
+
+Permanently remove a session's container and workspace volume. This
+cannot be undone — all cloned repos and session data are lost.
+
+Examples:
+  claude-dev delete my-feature
+EOF
+      ;;
+    list)
+      cat <<'EOF'
+Usage: claude-dev list
+
+List all sessions (running and stopped) with their status.
+
+Examples:
   claude-dev list
 EOF
+      ;;
+    help)
+      cat <<'EOF'
+Usage: claude-dev help [command]
+
+Show general help, or detailed help for a specific command.
+
+Examples:
+  claude-dev help
+  claude-dev help start
+  claude-dev help attach
+EOF
+      ;;
+    "")
+      usage
+      ;;
+    *)
+      echo "Unknown command: $1"
+      echo ""
+      usage
+      exit 1
+      ;;
+  esac
 }
 
 # ── Parse command ────────────────────────────────────────────────────────────
@@ -49,8 +193,13 @@ shift || true
 
 # Commands that don't need a session name
 case "$COMMAND" in
-  build|list|help|--help|-h|"")
+  build|list|"")
     # handled below without session name
+    ;;
+  help|--help|-h)
+    # grab optional subcommand before options parsing
+    HELP_SUBCMD="${1:-}"
+    shift || true
     ;;
   *)
     # All other commands require a session name as first argument
@@ -262,7 +411,7 @@ case "$COMMAND" in
     ;;
 
   help|--help|-h)
-    usage
+    command_help "${HELP_SUBCMD:-}"
     ;;
 
   "")
