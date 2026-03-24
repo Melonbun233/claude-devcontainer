@@ -1,6 +1,6 @@
 # claude-devcontainer
 
-Containerized environment for running Claude Code with `--dangerously-skip-permissions` safely, integrated with GitHub Enterprise and Jira.
+Containerized environment for running Claude Code with `--dangerously-skip-permissions` safely, integrated with GitHub Enterprise, Jira, and [gstack](https://github.com/garrytan/gstack) AI development skills.
 
 ## Prerequisites
 
@@ -29,11 +29,27 @@ cp config/workspace.yaml.example config/workspace.yaml
 ./claude-dev attach
 ```
 
+## Built-in Skills (gstack)
+
+The container ships with [gstack](https://github.com/garrytan/gstack), a collection of AI development workflow skills. Key skills:
+
+| Skill | Purpose |
+|-------|---------|
+| `/review` | Staff engineer code review with bug detection and auto-fixes |
+| `/investigate` | Systematic root-cause debugging |
+| `/qa` | Real browser testing with regression tests |
+| `/ship` | Create PRs with test verification |
+| `/plan-eng-review` | Architecture and data flow review |
+| `/cso` | Security audit (OWASP + STRIDE) |
+| `/benchmark` | Performance baselines and comparisons |
+
+gstack skills are available in both Develop and PR Review modes.
+
 ## Modes
 
 ### Develop (default)
 
-Interactive mode — you attach to the container and use Claude Code directly with full TTY formatting.
+Interactive mode — you attach to the container and use Claude Code directly with full TTY formatting. All gstack skills are available.
 
 ```bash
 ./claude-dev start --mode=develop
@@ -44,7 +60,7 @@ Interactive mode — you attach to the container and use Claude Code directly wi
 
 ### PR Review
 
-One-shot mode — reviews a PR and outputs comments.
+One-shot mode — reviews a PR using gstack's `/review` skill and outputs comments.
 
 ```bash
 # Dry-run (default): outputs review to file for you to inspect

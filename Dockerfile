@@ -54,6 +54,10 @@ RUN mkdir -p /home/claude/.claude \
              /home/claude/.claude/agents \
              /home/claude/.claude/skills
 
+# ── gstack (AI development workflow skills) ──────────────────────────────────
+RUN git clone https://github.com/garrytan/gstack.git /home/claude/.claude/skills/gstack \
+    && rm -rf /home/claude/.claude/skills/gstack/.git
+
 USER root
 
 # ── Copy scripts and config ─────────────────────────────────────────────────

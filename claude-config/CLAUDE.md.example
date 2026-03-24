@@ -23,9 +23,22 @@ When a task references a Jira issue, always read it first to understand the full
 
 ## Workflow
 
-1. Understand the task — read Jira issues and existing code
-2. Plan the approach before writing code
-3. Make focused, minimal changes
-4. Write or update tests
-5. Commit with descriptive messages following project conventions
-6. Create a PR if appropriate
+Use the gstack skills for structured development workflows:
+
+1. **Plan**: `/office-hours` to frame the problem, `/plan-eng-review` to lock architecture
+2. **Build**: Implement changes with focused, minimal edits
+3. **Review**: `/review` for pre-landing code review with auto-fixes
+4. **Test**: `/qa` for real browser testing, or run tests manually
+5. **Ship**: `/ship` to create PR with test verification
+
+### Key gstack skills available:
+- `/review` — Staff engineer code review with bug detection and auto-fixes
+- `/investigate` — Systematic root-cause debugging
+- `/qa` — Real browser testing with regression tests
+- `/ship` — Create PRs with test verification
+- `/plan-eng-review` — Architecture and data flow review
+- `/cso` — Security audit (OWASP + STRIDE)
+- `/benchmark` — Performance baselines and comparisons
+
+When a task references a Jira issue, always read it first to understand the full context.
+Commit with descriptive messages following project conventions.
