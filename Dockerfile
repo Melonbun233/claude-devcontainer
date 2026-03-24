@@ -52,11 +52,17 @@ RUN curl -fsSL https://claude.ai/install.sh | bash
 # ── Directories ──────────────────────────────────────────────────────────────
 RUN mkdir -p /home/claude/.claude \
              /home/claude/.claude/agents \
-             /home/claude/.claude/skills
+             /home/claude/.claude/skills \
+             /home/claude/.claude/plugins
 
 # ── gstack (AI development workflow skills) ──────────────────────────────────
 RUN git clone https://github.com/garrytan/gstack.git /home/claude/.claude/skills/gstack \
     && rm -rf /home/claude/.claude/skills/gstack/.git
+
+# ── superpowers (structured development workflow plugin) ─────────────────────
+RUN git clone https://github.com/obra/superpowers.git /home/claude/.claude/plugins/superpowers \
+    && rm -rf /home/claude/.claude/plugins/superpowers/.git \
+    && ln -s ../hooks/hooks.json /home/claude/.claude/plugins/superpowers/.claude-plugin/hooks.json
 
 USER root
 

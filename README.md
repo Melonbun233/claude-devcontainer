@@ -45,6 +45,24 @@ The container ships with [gstack](https://github.com/garrytan/gstack), a collect
 
 gstack skills are available in both Develop and PR Review modes.
 
+## Built-in Plugin (superpowers)
+
+The container includes [superpowers](https://github.com/obra/superpowers), a structured development workflow plugin with 14 composable skills:
+
+| Skill | Purpose |
+|-------|---------|
+| `brainstorming` | Structured ideation before coding |
+| `test-driven-development` | Write tests first, then implement |
+| `systematic-debugging` | Methodical root-cause analysis |
+| `writing-plans` | Structured planning documents |
+| `executing-plans` | Step-by-step plan execution |
+| `requesting-code-review` | Request and manage code reviews |
+| `receiving-code-review` | Process review feedback |
+| `subagent-driven-development` | Parallel agent workflows |
+| `verification-before-completion` | Ensure quality gates pass |
+
+Superpowers skills are triggered automatically during development tasks via a SessionStart hook.
+
 ## Modes
 
 ### Develop (default)

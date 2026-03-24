@@ -42,3 +42,17 @@ Use the gstack skills for structured development workflows:
 
 When a task references a Jira issue, always read it first to understand the full context.
 Commit with descriptive messages following project conventions.
+
+## Superpowers Plugin
+
+The [superpowers](https://github.com/obra/superpowers) plugin is installed globally, providing structured development workflows:
+- **Brainstorming** — structured ideation before coding
+- **Test-Driven Development** — write tests first, then implement
+- **Systematic Debugging** — methodical root-cause analysis
+- **Writing Plans** — structured planning documents
+- **Executing Plans** — step-by-step plan execution
+- **Code Review** — requesting and receiving reviews
+- **Subagent-Driven Development** — parallel agent workflows
+- **Verification Before Completion** — ensure quality gates pass
+
+Superpowers skills are invoked automatically during development tasks or via the Skill tool.
