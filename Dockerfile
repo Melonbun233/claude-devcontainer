@@ -37,7 +37,9 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Non-root user ───────────────────────────────────────────────────────────
-RUN useradd -m -s /bin/bash -u 1000 claude \
+# Ubuntu 24.04 has a default 'ubuntu' user at UID 1000; remove it first
+RUN userdel -r ubuntu 2>/dev/null || true \
+    && useradd -m -s /bin/bash -u 1000 claude \
     && echo "claude ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/claude
 
 USER claude
@@ -71,7 +73,7 @@ RUN chmod +x /scripts/*.sh /scripts/modes/*.sh \
 ENV DISABLE_AUTOUPDATER=1 \
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
     TERM=xterm-256color \
-    PATH="/home/claude/.claude/local/bin:${PATH}"
+    PATH="/home/claude/.local/bin:${PATH}"
 
 USER claude
 WORKDIR /workspace
