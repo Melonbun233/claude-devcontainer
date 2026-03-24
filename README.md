@@ -1,6 +1,6 @@
 # claude-devcontainer
 
-Containerized environment for running Claude Code with `--dangerously-skip-permissions` safely, integrated with GitHub Enterprise, Jira, and [gstack](https://github.com/garrytan/gstack) AI development skills.
+Containerized environment for running Claude Code with `--dangerously-skip-permissions` safely, integrated with GitHub Enterprise, Jira, and pre-installed AI development skills.
 
 ## Prerequisites
 
@@ -29,9 +29,13 @@ cp config/workspace.yaml.example config/workspace.yaml
 ./claude-dev attach my-feature
 ```
 
-## Built-in Skills (gstack)
+## Built-in Skills & Plugins
 
-The container ships with [gstack](https://github.com/garrytan/gstack), a collection of AI development workflow skills. Key skills:
+The container ships with two complementary skill sets pre-installed, available in all modes.
+
+### [gstack](https://github.com/garrytan/gstack) — Development Workflow Skills
+
+28 skills for day-to-day development. Key skills:
 
 | Skill | Purpose |
 |-------|---------|
@@ -43,11 +47,9 @@ The container ships with [gstack](https://github.com/garrytan/gstack), a collect
 | `/cso` | Security audit (OWASP + STRIDE) |
 | `/benchmark` | Performance baselines and comparisons |
 
-gstack skills are available in both Develop and PR Review modes.
+### [superpowers](https://github.com/obra/superpowers) — Structured Development Methodology
 
-## Built-in Plugin (superpowers)
-
-The container includes [superpowers](https://github.com/obra/superpowers), a structured development workflow plugin with 14 composable skills:
+14 composable skills providing a complete software development workflow. Key skills:
 
 | Skill | Purpose |
 |-------|---------|
@@ -57,17 +59,16 @@ The container includes [superpowers](https://github.com/obra/superpowers), a str
 | `writing-plans` | Structured planning documents |
 | `executing-plans` | Step-by-step plan execution |
 | `requesting-code-review` | Request and manage code reviews |
-| `receiving-code-review` | Process review feedback |
 | `subagent-driven-development` | Parallel agent workflows |
 | `verification-before-completion` | Ensure quality gates pass |
 
-Superpowers skills are triggered automatically during development tasks via a SessionStart hook.
+Superpowers skills are automatically injected into every session via a SessionStart hook.
 
 ## Modes
 
 ### Develop (default)
 
-Interactive mode — you attach to the container and use Claude Code directly with full TTY formatting. All gstack skills are available.
+Interactive mode — you attach to the container and use Claude Code directly with full TTY formatting. All gstack and superpowers skills are available.
 
 ```bash
 ./claude-dev start my-feature
