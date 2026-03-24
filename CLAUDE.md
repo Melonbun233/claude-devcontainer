@@ -60,7 +60,12 @@ Four read-only scripts in `jira-cli/` all source `jira-common.sh` for shared aut
 
 ### Configuration Cascade
 
-Precedence: host config (`/host-config`) > built-in (`/etc/claude-dev/claude-config`) > per-repo (`/host-config/repos/<name>/`). Settings merged with `jq -s '.[0] * .[1]'`.
+Built-in config (baked into image at `/etc/claude-dev/claude-config/`) is installed first, then host config (`/host-config`) is layered on top:
+- **CLAUDE.md**: host content **appended** to built-in (both preserved)
+- **settings.json**: host values **merged** via `jq -s '.[0] * .[1]'` (host wins)
+- **agents/skills**: host files override built-in if same name
+
+Per-repo config (`/host-config/repos/<name>/`) is copied to `/workspace/<name>/.claude/`.
 
 ### Modes
 

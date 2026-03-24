@@ -36,7 +36,7 @@ entrypoint.sh
   ├── setup-github.sh      # Auth gh CLI per server in workspace.yaml
   ├── setup-jira.sh         # Validate Jira connection
   ├── clone-repos.sh        # Clone repos from workspace.yaml
-  ├── setup-claude-config.sh # Copy host CLAUDE.md, agents, skills
+  ├── setup-claude-config.sh # Install built-in config, layer host overrides
   ├── create session dir    # /workspace/.claude-session/
   └── dispatch mode
       ├── develop.sh        # sleep infinity, user attaches
