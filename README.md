@@ -1,6 +1,6 @@
 # claude-devcontainer
 
-Containerized environment for running Claude Code with `--dangerously-skip-permissions` safely, integrated with GitHub Enterprise, Jira, and pre-installed AI development skills.
+Containerized environment for running Claude Code with `--dangerously-skip-permissions` "safely", integrated with GitHub Enterprise, Jira, and pre-installed AI development skills.
 
 ## Prerequisites
 
@@ -74,6 +74,8 @@ Interactive mode — you attach to the container and use Claude Code directly wi
 ./claude-dev attach my-feature --skip-permissions
 ```
 
+> **Note:** The `--skip-permissions` flag passes `--dangerously-skip-permissions` to Claude Code, which allows Claude to execute tools (shell commands, file writes, etc.) without asking for confirmation. Only use this in a containerized environment where you are comfortable with Claude making unrestricted changes.
+
 ### PR Review
 
 One-shot mode — reviews a PR using gstack's `/review` skill and outputs comments.
@@ -125,6 +127,22 @@ GH_ENTERPRISE_TOKEN=ghp_yyy
 ```
 
 All variables from `.env` are automatically passed to the container.
+
+### Repos
+
+Define repos to clone into the workspace in `config/workspace.yaml`. These are general-purpose repos needed for your tasks — reference documentation, codebases, shared configs, etc. Each repo is cloned to `/workspace/<target>` on session start.
+
+```yaml
+repos:
+  - url: https://github.com/org/my-service
+    branch: main          # optional: only clone this branch (faster)
+    target: my-service
+
+  - url: https://github.com/org/docs
+    target: docs           # no branch — clones all branches
+```
+
+The `branch` field is optional. When set, only that branch is cloned (`--single-branch`), saving time and bandwidth. When omitted, the full repo with all branches is cloned. The URL host must match one of the `github_servers` entries for authentication.
 
 ### SSL / TLS for GitHub Enterprise
 

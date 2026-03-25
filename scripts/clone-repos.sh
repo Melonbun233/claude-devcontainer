@@ -40,7 +40,7 @@ CLONE_ERRORS=0
 
 for i in $(seq 0 $((REPO_COUNT - 1))); do
   URL=$(yq ".repos[$i].url" "$CONFIG_FILE")
-  BRANCH=$(yq ".repos[$i].branch // \"main\"" "$CONFIG_FILE")
+  BRANCH=$(yq ".repos[$i].branch // \"\"" "$CONFIG_FILE")
   TARGET=$(yq ".repos[$i].target" "$CONFIG_FILE")
 
   DEST="/workspace/$TARGET"
@@ -68,15 +68,26 @@ for i in $(seq 0 $((REPO_COUNT - 1))); do
       CLONE_URL="$URL"
     fi
 
-    echo "  Cloning $URL → $DEST (branch: $BRANCH)..."
+    if [ -n "$BRANCH" ]; then
+      echo "  Cloning $URL → $DEST (branch: $BRANCH)..."
+    else
+      echo "  Cloning $URL → $DEST (all branches)..."
+    fi
+
+    # Build clone arguments: use --single-branch when branch is specified
+    CLONE_ARGS=()
+    if [ -n "$BRANCH" ]; then
+      CLONE_ARGS+=(--branch "$BRANCH" --single-branch)
+    fi
+
     if [ "$SSL_VERIFY" = "false" ]; then
-      if ! GIT_SSL_NO_VERIFY=true git clone --branch "$BRANCH" --single-branch "$CLONE_URL" "$DEST" 2>&1 | sed 's/^/    /'; then
+      if ! GIT_SSL_NO_VERIFY=true git clone "${CLONE_ARGS[@]}" "$CLONE_URL" "$DEST" 2>&1 | sed 's/^/    /'; then
         echo "  WARN: Failed to clone $URL (continuing with remaining repos)"
         CLONE_ERRORS=$((CLONE_ERRORS + 1))
         continue
       fi
     else
-      if ! git clone --branch "$BRANCH" --single-branch "$CLONE_URL" "$DEST" 2>&1 | sed 's/^/    /'; then
+      if ! git clone "${CLONE_ARGS[@]}" "$CLONE_URL" "$DEST" 2>&1 | sed 's/^/    /'; then
         echo "  WARN: Failed to clone $URL (continuing with remaining repos)"
         CLONE_ERRORS=$((CLONE_ERRORS + 1))
         continue

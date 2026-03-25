@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Containerized Claude Code environment (`ubuntu:24.04`) for running `--dangerously-skip-permissions` safely, with GitHub Enterprise multi-server auth, read-only Jira integration, and pre-installed skills (gstack + superpowers).
+Containerized Claude Code environment (`ubuntu:24.04`) for running `--dangerously-skip-permissions` "safely", with GitHub Enterprise multi-server auth, read-only Jira integration, and pre-installed skills (gstack + superpowers).
 
 ## Build & Run
 
@@ -33,7 +33,7 @@ There is no test suite. Verify changes by building the image and starting a sess
 3. Copy + rewrite host `~/.claude/settings.json` (`localhost` → `host.docker.internal`)
 4. `setup-github.sh` — authenticate `gh` CLI per server (supports `ssl_verify: false`)
 5. `setup-jira.sh` — validate Jira connection (Cloud v3 or DC v2 API)
-6. `clone-repos.sh` — clone repos with per-server token injection, SSL config, per-repo git identity
+6. `clone-repos.sh` — clone repos with per-server token injection, SSL config, per-repo git identity, branch-scoped cloning
 7. `setup-claude-config.sh` — cascade host → built-in → per-repo config
 8. Create `/workspace/.claude-session/` (status.json, output.log)
 9. `exec /scripts/modes/${MODE}.sh`
