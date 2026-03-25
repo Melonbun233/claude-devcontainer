@@ -29,19 +29,6 @@ if [ -f "$BUILTIN_CONFIG/settings.json" ]; then
   fi
 fi
 
-# Built-in agents
-if [ -d "$BUILTIN_CONFIG/agents" ]; then
-  mkdir -p "$CLAUDE_HOME/agents"
-  cp "$BUILTIN_CONFIG/agents/"*.md "$CLAUDE_HOME/agents/" 2>/dev/null || true
-  echo "  Installed built-in agents"
-fi
-
-# Built-in skills
-if [ -d "$BUILTIN_CONFIG/skills" ]; then
-  cp -r "$BUILTIN_CONFIG/skills/"* "$CLAUDE_HOME/skills/" 2>/dev/null || true
-  echo "  Installed built-in skills"
-fi
-
 # ── Step 2: Layer host config on top ──────────────────────────────────────────
 
 if [ -d "$HOST_CONFIG" ]; then
