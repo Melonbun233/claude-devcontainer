@@ -281,12 +281,22 @@ case "$COMMAND" in
     ;;
 
   launch)
-    MODE="${MODE:-develop}"
-    export MODE
-
     CLAUDE_ARGS=""
     if [ "$SKIP_PERMISSIONS" = "true" ]; then
       CLAUDE_ARGS="--dangerously-skip-permissions"
+    fi
+
+    # Set up cleanup trap if --rm (covers all exit paths including Ctrl+C)
+    if [ "$AUTO_REMOVE" = "true" ]; then
+      cleanup_session() {
+        echo ""
+        echo ":: Cleaning up session '$SESSION_NAME'..."
+        docker stop "$CONTAINER_NAME" >/dev/null 2>&1 || true
+        docker rm "$CONTAINER_NAME" >/dev/null 2>&1 || true
+        docker volume rm "$VOLUME_NAME" >/dev/null 2>&1 || true
+        echo ":: Session cleaned up."
+      }
+      trap cleanup_session EXIT
     fi
 
     # If already running, prompt the user
@@ -300,18 +310,27 @@ case "$COMMAND" in
       read -rp "Choice [r/d/q]: " choice
       case "$choice" in
         r|R)
-          exec docker exec -it "$CONTAINER_NAME" claude $CLAUDE_ARGS
+          docker exec -it "$CONTAINER_NAME" claude $CLAUDE_ARGS
+          exit 0
           ;;
         d|D)
           echo ":: Deleting session '$SESSION_NAME'..."
+          # Temporarily disable trap for the intentional delete
+          trap - EXIT
           docker stop "$CONTAINER_NAME" >/dev/null
           docker rm "$CONTAINER_NAME" >/dev/null
           if docker volume inspect "$VOLUME_NAME" &>/dev/null; then
             docker volume rm "$VOLUME_NAME" >/dev/null
           fi
+          # Re-enable trap for the new session
+          if [ "$AUTO_REMOVE" = "true" ]; then
+            trap cleanup_session EXIT
+          fi
           # fall through to create new session
           ;;
         *)
+          # Disable trap — user chose to quit, not to clean up
+          trap - EXIT
           exit 0
           ;;
       esac
@@ -322,11 +341,7 @@ case "$COMMAND" in
       echo ":: Restarting stopped session '$SESSION_NAME'..."
       docker start "$CONTAINER_NAME"
     else
-      echo ":: Creating session '$SESSION_NAME' ($MODE mode)..."
-      if [ -n "$PR_REF" ]; then
-        export PR_NUMBER="$PR_REF"
-      fi
-      export DRY_RUN SKIP_PERMISSIONS
+      echo ":: Creating session '$SESSION_NAME'..."
       $COMPOSE up -d
     fi
 
@@ -349,12 +364,14 @@ case "$COMMAND" in
     docker logs -f "$CONTAINER_NAME" 2>&1 &
     LOGS_PID=$!
 
-    # Clean up log streaming on exit (Ctrl+C or error)
+    # Temporarily override trap to also clean up log streaming
     cleanup_logs() {
       kill "$LOGS_PID" 2>/dev/null || true
       wait "$LOGS_PID" 2>/dev/null || true
     }
-    trap cleanup_logs EXIT
+    # Save the --rm cleanup for after logs are done
+    PREV_TRAP="$AUTO_REMOVE"
+    trap 'cleanup_logs; [ "$PREV_TRAP" = "true" ] && cleanup_session' EXIT
 
     # Poll for the readiness sentinel file
     READY_TIMEOUT=300
@@ -373,9 +390,13 @@ case "$COMMAND" in
       sleep 1
     done
 
-    # Stop log streaming
+    # Stop log streaming, restore --rm-only trap
     cleanup_logs
-    trap - EXIT
+    if [ "$AUTO_REMOVE" = "true" ]; then
+      trap cleanup_session EXIT
+    else
+      trap - EXIT
+    fi
 
     if ! docker exec "$CONTAINER_NAME" test -f /workspace/.claude-session/ready 2>/dev/null; then
       echo ""
@@ -386,13 +407,10 @@ case "$COMMAND" in
 
     echo ""
     echo ":: Attaching to session '$SESSION_NAME'..."
-    exec docker exec -it "$CONTAINER_NAME" claude $CLAUDE_ARGS
+    docker exec -it "$CONTAINER_NAME" claude $CLAUDE_ARGS
     ;;
 
   start)
-    MODE="${MODE:-develop}"
-    export MODE
-
     # Check if session is already running
     if container_running; then
       echo "ERROR: Session '$SESSION_NAME' is already running."
@@ -407,22 +425,12 @@ case "$COMMAND" in
       echo ":: Restarting stopped session '$SESSION_NAME'..."
       docker start "$CONTAINER_NAME"
     else
-      if [ -n "$PR_REF" ]; then
-        export PR_NUMBER="$PR_REF"
-      fi
-      export DRY_RUN SKIP_PERMISSIONS
       $COMPOSE up -d
     fi
 
     echo ""
-    if [ "$MODE" = "develop" ]; then
-      echo "Session '$SESSION_NAME' started in develop mode."
-      echo "Attach with:  ./claude-dev attach $SESSION_NAME"
-    else
-      echo "Session '$SESSION_NAME' started in $MODE mode."
-      echo "Check status: ./claude-dev status $SESSION_NAME"
-      echo "View logs:    ./claude-dev logs $SESSION_NAME"
-    fi
+    echo "Session '$SESSION_NAME' started."
+    echo "Attach with:  ./claude-dev attach $SESSION_NAME"
     ;;
 
   attach)
@@ -448,27 +456,64 @@ case "$COMMAND" in
     ;;
 
   run)
-    MODE="${MODE:-pr-review}"
-    if [ "$MODE" = "pr-review" ] && [ -z "$PR_REF" ]; then
-      echo "ERROR: --pr=<ref> is required for pr-review mode."
+    # Parse --pr shorthand (supports org/repo#123 format)
+    if [ -n "$PR_REF" ]; then
+      if [[ "$PR_REF" == *"#"* ]]; then
+        PR_REPO="${PR_REF%%#*}"
+        PR_NUM="${PR_REF##*#}"
+        PROMPT="Use the /review skill to review PR #$PR_NUM in repo $PR_REPO. Analyze all changes compared to the base branch. Output your review as markdown."
+      else
+        PR_NUM="$PR_REF"
+        PROMPT="Use the /review skill to review PR #$PR_NUM. Analyze all changes compared to the base branch. Output your review as markdown."
+      fi
+    elif [ -n "$PROMPT_ARG" ]; then
+      PROMPT="$PROMPT_ARG"
+    else
+      echo "ERROR: --prompt=<text> or --pr=<ref> is required for run."
+      echo ""
+      echo "  Examples:"
+      echo "    ./claude-dev run $SESSION_NAME --prompt=\"Respond with: hello\""
+      echo "    ./claude-dev run $SESSION_NAME --pr=123"
       exit 1
     fi
-    export MODE PR_NUMBER="$PR_REF" DRY_RUN SKIP_PERMISSIONS
-    $COMPOSE run --rm --name "$CONTAINER_NAME" claude-dev
-    ;;
 
-  pr-submit)
-    REVIEW_FILE="/workspace/.claude-session/review.md"
-    PR_NUMBER=$(docker exec "$CONTAINER_NAME" jq -r '.pr_number // empty' /workspace/.claude-session/status.json 2>/dev/null || true)
-
-    if [ -z "$PR_NUMBER" ]; then
-      echo "ERROR: No PR number found in session '$SESSION_NAME'. Run a PR review first."
-      exit 1
+    # Clean up any existing container with the same name (from a prior --keep)
+    if container_exists; then
+      docker stop "$CONTAINER_NAME" >/dev/null 2>&1 || true
+      docker rm "$CONTAINER_NAME" >/dev/null 2>&1 || true
+      docker volume rm "$VOLUME_NAME" >/dev/null 2>&1 || true
     fi
 
-    echo "Posting review to PR #$PR_NUMBER..."
-    docker exec "$CONTAINER_NAME" sh -c "gh pr review $PR_NUMBER --comment --body \"\$(cat $REVIEW_FILE)\""
-    echo "Review posted."
+    export ONE_SHOT_PROMPT="$PROMPT"
+
+    # Run in foreground, blocks until container exits
+    $COMPOSE up --abort-on-container-exit
+
+    # Extract output using docker cp (container is stopped after --abort-on-container-exit)
+    OUTPUT_FILE=$(mktemp)
+    docker cp "$CONTAINER_NAME:/workspace/.claude-session/output.md" "$OUTPUT_FILE" 2>/dev/null || true
+
+    # Post review if --post and --pr
+    if [ "$POST_REVIEW" = "true" ] && [ -n "$PR_REF" ]; then
+      if [ -s "$OUTPUT_FILE" ]; then
+        echo ":: Posting review to GitHub..."
+        REVIEW_BODY=$(cat "$OUTPUT_FILE")
+        gh pr review "${PR_NUM}" ${PR_REPO:+--repo "$PR_REPO"} --comment --body "$REVIEW_BODY"
+        echo "  Review posted to PR #${PR_NUM}"
+      else
+        echo "ERROR: No output to post. Check session logs."
+      fi
+    fi
+    rm -f "$OUTPUT_FILE"
+
+    # Default: auto-remove. --keep to preserve.
+    if [ "$KEEP_SESSION" != "true" ]; then
+      docker rm "$CONTAINER_NAME" >/dev/null 2>&1 || true
+      docker volume rm "$VOLUME_NAME" >/dev/null 2>&1 || true
+      echo ":: Session cleaned up."
+    else
+      echo ":: Session preserved. Start and attach: ./claude-dev start $SESSION_NAME && ./claude-dev attach $SESSION_NAME"
+    fi
     ;;
 
   status)
