@@ -33,14 +33,15 @@
 
 ```
 entrypoint.sh
-  ├── setup-github.sh      # Auth gh CLI per server in workspace.yaml
+  ├── setup-certs.sh        # Install custom CA certificates
+  ├── setup-github.sh       # Auth gh CLI per server in workspace.yaml
   ├── setup-jira.sh         # Validate Jira connection
   ├── clone-repos.sh        # Clone repos from workspace.yaml
   ├── setup-claude-config.sh # Install built-in config, layer host overrides
   ├── create session dir    # /workspace/.claude-session/
-  └── dispatch mode
-      ├── develop.sh        # sleep infinity, user attaches
-      └── pr-review.sh      # one-shot review, exit
+  └── dispatch
+      ├── ONE_SHOT_PROMPT set → claude -p, save output, exit
+      └── otherwise           → sleep infinity (develop, user attaches)
 ```
 
 ## Volume Mounts
@@ -50,7 +51,7 @@ entrypoint.sh
 | `~/.claude.json` | `/home/claude/.claude.json:ro` | Anthropic API config |
 | `~/.claude/settings.json` | `/tmp/.claude.settings.host:ro` | Auth tokens, base URL, model config |
 | `./host-config/` | `/host-config:ro` | CLAUDE.md, agents, skills |
-| `./config/` | `/etc/claude-dev/config:ro` | workspace.yaml, mode configs |
+| `./config/` | `/etc/claude-dev/config:ro` | workspace.yaml |
 | `workspace` (volume) | `/workspace` | Cloned repos (persistent) |
 
 ## Environment Variables
@@ -80,8 +81,6 @@ By default, config is inherited from the host's `~/.claude.json` and `~/.claude/
 
 | Variable | Set by | Description |
 |----------|--------|-------------|
-| `MODE` | `--mode=` flag | `develop` (default) or `pr-review` |
 | `SESSION_NAME` | positional arg | Session name |
-| `PR_NUMBER` | `--pr=` flag | PR number or `org/repo#number` |
-| `DRY_RUN` | `--no-dry-run` flag | `true` (default) — save review to file |
-| `SKIP_PERMISSIONS` | `--skip-permissions` flag | `--dangerously-skip-permissions` in develop mode |
+| `CONTAINER_NAME` | derived | `claude-dev-<session-name>` |
+| `ONE_SHOT_PROMPT` | `--prompt=` or `--pr=` | Prompt for one-shot `run` command |
