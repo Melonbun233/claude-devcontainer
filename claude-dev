@@ -17,10 +17,9 @@ A session name is required for all commands (except build, list, help).
 Commands:
   build                                Build the container image
   launch <name> [options]              Start + attach in one step
-  start <name> [--mode=develop]        Start a new session
+  start <name> [--skip-permissions]    Start a new session
   attach <name> [--skip-permissions]   Attach to a running session
-  run <name> --mode=pr-review --pr=REF Run a one-shot PR review
-  pr-submit <name>                     Post the last dry-run review to GitHub
+  run <name> --prompt=<text> [options] Run a one-shot prompt
   status <name>                        Show session status
   logs <name>                          Tail session output log
   stop <name>                          Stop session (can be restarted later)
@@ -53,14 +52,13 @@ Start a session and immediately attach to Claude Code. If the session
 is already running, you'll be prompted to re-attach or replace it.
 
 Options:
-  --mode=<mode>         Mode to run: develop (default) or pr-review
   --skip-permissions    Enable --dangerously-skip-permissions
-  --pr=<ref>            PR number for pr-review mode
+  --rm                  Auto-remove session when Claude exits
 
 Examples:
   claude-dev launch my-feature
   claude-dev launch my-feature --skip-permissions
-  claude-dev launch review-123 --mode=pr-review --pr=123
+  claude-dev launch my-feature --rm
 EOF
       ;;
     start)
@@ -71,17 +69,14 @@ Start a new session or restart a stopped one. Each session gets its own
 container and persistent workspace volume.
 
 Options:
-  --mode=<mode>         Mode to run: develop (default) or pr-review
   --skip-permissions    Enable --dangerously-skip-permissions
-  --pr=<ref>            PR number for pr-review mode
 
 If the session was previously stopped, it is restarted with its existing
 workspace data intact.
 
 Examples:
   claude-dev start my-feature
-  claude-dev start my-feature --mode=develop
-  claude-dev start review-123 --mode=pr-review --pr=123
+  claude-dev start my-feature --skip-permissions
 EOF
       ;;
     attach)
@@ -102,37 +97,30 @@ EOF
       ;;
     run)
       cat <<'EOF'
-Usage: claude-dev run <session-name> --mode=pr-review --pr=<ref> [options]
+Usage: claude-dev run <session-name> --prompt=<text> [options]
+       claude-dev run <session-name> --pr=<ref> [options]
 
-Run a one-shot task (e.g., PR review) and exit. The container is removed
-after completion.
+Run a one-shot prompt in a fresh container. The session is auto-removed
+after completion unless --keep is specified.
 
 Options:
-  --mode=<mode>         Mode to run (default: pr-review)
-  --pr=<ref>            PR number or org/repo#number (required for pr-review)
-  --no-dry-run          Post review directly to GitHub instead of saving to file
+  --prompt=<text>       Prompt to send to Claude (required unless --pr)
+  --pr=<ref>            PR review shorthand: number or org/repo#number
+  --post                Post PR review to GitHub after completion
+  --keep                Preserve session for later inspection (default: auto-remove)
 
 Examples:
-  claude-dev run review-123 --mode=pr-review --pr=123
-  claude-dev run review-456 --mode=pr-review --pr=org/repo#456 --no-dry-run
-EOF
-      ;;
-    pr-submit)
-      cat <<'EOF'
-Usage: claude-dev pr-submit <session-name>
-
-Post a saved dry-run review to GitHub. The session must have a completed
-PR review saved in /workspace/.claude-session/review.md.
-
-Examples:
-  claude-dev pr-submit review-123
+  claude-dev run task1 --prompt "Respond with only: test successful"
+  claude-dev run review1 --pr=123
+  claude-dev run review2 --pr=org/repo#456 --post
+  claude-dev run review3 --pr=123 --keep
 EOF
       ;;
     status)
       cat <<'EOF'
 Usage: claude-dev status <session-name>
 
-Show session status including mode, start time, and container info.
+Show session status including type, start time, and container info.
 For stopped sessions, shows restart/delete instructions.
 
 Examples:
@@ -255,16 +243,20 @@ if [ -n "${SESSION_NAME:-}" ]; then
 fi
 
 # ── Parse remaining options ─────────────────────────────────────────────────
-MODE=""
 PR_REF=""
-DRY_RUN="true"
 SKIP_PERMISSIONS="false"
+PROMPT_ARG=""
+POST_REVIEW="false"
+KEEP_SESSION="false"
+AUTO_REMOVE="false"
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --mode=*)        MODE="${1#--mode=}" ;;
     --pr=*)          PR_REF="${1#--pr=}" ;;
-    --no-dry-run)    DRY_RUN="false" ;;
+    --prompt=*)      PROMPT_ARG="${1#--prompt=}" ;;
+    --post)          POST_REVIEW="true" ;;
+    --keep)          KEEP_SESSION="true" ;;
+    --rm)            AUTO_REMOVE="true" ;;
     --skip-permissions) SKIP_PERMISSIONS="true" ;;
     --help|-h)       usage; exit 0 ;;
     *)               echo "Unknown option: $1"; usage; exit 1 ;;
