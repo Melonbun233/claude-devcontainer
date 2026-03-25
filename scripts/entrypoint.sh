@@ -12,6 +12,9 @@ echo "│  Time:    $(printf '%-34s' "$(date -u +%Y-%m-%dT%H:%M:%SZ)")│"
 echo "└──────────────────────────────────────────────┘"
 echo ""
 
+# Clear stale readiness sentinel from a previous run
+rm -f /workspace/.claude-session/ready
+
 # ── Validate mode ────────────────────────────────────────────────────────────
 case "$MODE" in
   develop|pr-review)
@@ -92,6 +95,9 @@ touch "$SESSION_DIR/output.log"
 echo ""
 echo ":: Setup complete. Launching mode: $MODE"
 echo ""
+
+# Signal readiness to the host CLI
+touch /workspace/.claude-session/ready
 
 # ── Dispatch to mode script ──────────────────────────────────────────────────
 exec /scripts/modes/${MODE}.sh

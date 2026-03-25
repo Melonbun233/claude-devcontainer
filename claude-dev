@@ -338,8 +338,8 @@ case "$COMMAND" in
       $COMPOSE up -d
     fi
 
-    # Wait for container to be ready
-    echo ":: Waiting for container to be ready..."
+    # Wait for container to be running
+    echo ":: Waiting for container to start..."
     for i in $(seq 1 30); do
       if container_running; then
         break
@@ -352,9 +352,47 @@ case "$COMMAND" in
       exit 1
     fi
 
-    # Give entrypoint a moment to initialize
-    sleep 2
+    # Stream entrypoint output while waiting for setup to complete
+    echo ""
+    docker logs -f "$CONTAINER_NAME" 2>&1 &
+    LOGS_PID=$!
 
+    # Clean up log streaming on exit (Ctrl+C or error)
+    cleanup_logs() {
+      kill "$LOGS_PID" 2>/dev/null || true
+      wait "$LOGS_PID" 2>/dev/null || true
+    }
+    trap cleanup_logs EXIT
+
+    # Poll for the readiness sentinel file
+    READY_TIMEOUT=300
+    for i in $(seq 1 "$READY_TIMEOUT"); do
+      if docker exec "$CONTAINER_NAME" test -f /workspace/.claude-session/ready 2>/dev/null; then
+        break
+      fi
+      if ! container_running; then
+        cleanup_logs
+        echo ""
+        echo "ERROR: Container stopped unexpectedly during setup."
+        echo "  Check logs: docker logs $CONTAINER_NAME"
+        trap - EXIT
+        exit 1
+      fi
+      sleep 1
+    done
+
+    # Stop log streaming
+    cleanup_logs
+    trap - EXIT
+
+    if ! docker exec "$CONTAINER_NAME" test -f /workspace/.claude-session/ready 2>/dev/null; then
+      echo ""
+      echo "ERROR: Setup did not complete within ${READY_TIMEOUT} seconds."
+      echo "  Check logs: docker logs $CONTAINER_NAME"
+      exit 1
+    fi
+
+    echo ""
     echo ":: Attaching to session '$SESSION_NAME'..."
     exec docker exec -it "$CONTAINER_NAME" claude $CLAUDE_ARGS
     ;;
