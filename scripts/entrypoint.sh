@@ -4,7 +4,7 @@ set -euo pipefail
 # ── Banner ───────────────────────────────────────────────────────────────────
 SESSION_NAME="${SESSION_NAME:-default}"
 echo "┌──────────────────────────────────────────────┐"
-echo "│  claude-devcontainer                         │"
+echo "│  claude-sandbox                              │"
 echo "│  Session: $(printf '%-34s' "$SESSION_NAME")│"
 echo "│  Time:    $(printf '%-34s' "$(date -u +%Y-%m-%dT%H:%M:%SZ)")│"
 echo "└──────────────────────────────────────────────┘"

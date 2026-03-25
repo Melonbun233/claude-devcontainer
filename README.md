@@ -1,4 +1,4 @@
-# claude-devcontainer
+# claude-sandbox
 
 Containerized environment for running Claude Code with `--dangerously-skip-permissions` "safely", integrated with GitHub Enterprise, Jira, and pre-installed AI development skills.
 

@@ -43,7 +43,7 @@ Run containers as K8s Jobs/CronJobs:
 ## Host-Side SKILL Plugin
 
 Claude Code skill on the host machine to spawn containers:
-- `/container-start` skill to launch claude-devcontainer
+- `/container-start` skill to launch claude-sandbox
 - Monitor running containers and their status
 - Dashboard UI for managing multiple container sessions
 
