@@ -11,10 +11,12 @@ Containerized Claude Code environment (`ubuntu:24.04`) for running `--dangerousl
 ```bash
 ./claude-dev build                          # docker compose build
 ./claude-dev launch <name>                  # start + attach in one step
+./claude-dev launch <name> --rm             # start + attach, auto-cleanup on exit
 ./claude-dev start <name>                   # start named session (required)
 ./claude-dev attach <name>                  # attach interactively
+./claude-dev run <name> --prompt="<text>"   # run one-shot prompt
+./claude-dev run <name> --pr=123            # run PR review
 ./claude-dev stop <name>                    # stop (preserves state)
-./claude-dev start <name>                   # restart stopped session
 ./claude-dev delete <name>                  # permanently remove container + volume
 ./claude-dev list                           # show all sessions
 ./claude-dev help <command>                 # per-command help
@@ -36,7 +38,7 @@ There is no test suite. Verify changes by building the image and starting a sess
 6. `clone-repos.sh` — clone repos with per-server token injection, SSL config, per-repo git identity, branch-scoped cloning
 7. `setup-claude-config.sh` — cascade host → built-in → per-repo config
 8. Create `/workspace/.claude-session/` (status.json, output.log)
-9. `exec /scripts/modes/${MODE}.sh`
+9. If `ONE_SHOT_PROMPT` set → run `claude -p`, save output, exit; otherwise → `sleep infinity`
 
 ### Named Sessions
 
@@ -68,10 +70,10 @@ Built-in config (baked into image at `/etc/claude-dev/claude-config/`) is instal
 
 Per-repo config (`/host-config/repos/<name>/`) is copied to `/workspace/<name>/.claude/`.
 
-### Modes
+### One-Shot vs Develop
 
-- **develop**: `sleep infinity`, user attaches with `docker exec -it`
-- **pr-review**: checks out PR branch, runs `claude -p --dangerously-skip-permissions` with gstack `/review`, saves to `review.md` (dry-run default) or posts via `gh pr review`
+- **develop** (default): `sleep infinity`, user attaches with `docker exec -it`
+- **one-shot** (`run` command): runs `claude -p --dangerously-skip-permissions` with the provided prompt, saves output to `output.md`, exits
 
 ## Key Files
 
@@ -81,7 +83,6 @@ Per-repo config (`/host-config/repos/<name>/`) is copied to `/workspace/<name>/.
 | `docker-compose.yaml` | Parameterized service; `env_file: .env` passes all credentials |
 | `scripts/entrypoint.sh` | Container init orchestrator |
 | `scripts/setup-*.sh` | GitHub auth, Jira validation, repo cloning, config cascade |
-| `scripts/modes/*.sh` | Mode-specific handlers (develop, pr-review) |
 | `jira-cli/jira-common.sh` | Shared Jira auth/HTTP library |
 | `jira-cli/jira-*.sh` | Query scripts (get-issue, search, get-subtasks, get-sprint) |
 | `config/workspace.yaml` | User's GitHub servers + repos (gitignored) |
