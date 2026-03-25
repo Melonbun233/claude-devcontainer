@@ -12,7 +12,7 @@ if [ ! -f "$STATUS_FILE" ]; then
   exit 0
 fi
 
-MODE=$(jq -r '.mode // "unknown"' "$STATUS_FILE")
+TYPE=$(jq -r '.type // "unknown"' "$STATUS_FILE")
 SESSION=$(jq -r '.session_name // "unknown"' "$STATUS_FILE")
 STARTED=$(jq -r '.started_at // "unknown"' "$STATUS_FILE")
 CONTAINER=$(jq -r '.container_id // "unknown"' "$STATUS_FILE")
@@ -21,7 +21,7 @@ echo "┌───────────────────────�
 echo "│  Session Status                              │"
 echo "├──────────────────────────────────────────────┤"
 echo "│  Session:   $(printf '%-33s' "$SESSION")│"
-echo "│  Mode:      $(printf '%-33s' "$MODE")│"
+echo "│  Type:      $(printf '%-33s' "$TYPE")│"
 echo "│  Started:   $(printf '%-33s' "$STARTED")│"
 echo "│  Container: $(printf '%-33s' "$CONTAINER")│"
 
@@ -42,8 +42,8 @@ if [ -f "$LOG_FILE" ] && [ -s "$LOG_FILE" ]; then
 fi
 
 # Show review file if present
-REVIEW_FILE="$SESSION_DIR/review.md"
+REVIEW_FILE="$SESSION_DIR/output.md"
 if [ -f "$REVIEW_FILE" ]; then
   echo ""
-  echo "── PR Review available at: $REVIEW_FILE ──"
+  echo "── Output available at: $REVIEW_FILE ──"
 fi
