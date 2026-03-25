@@ -1,7 +1,7 @@
 services:
   claude-dev:
     build: .
-    image: claude-devcontainer:latest
+    image: claude-sandbox:latest
     container_name: ${CONTAINER_NAME:-claude-dev}
     labels:
       com.claude-dev.session: "true"
