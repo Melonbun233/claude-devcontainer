@@ -41,6 +41,7 @@ claude-dev help [command]
 **`launch`** — removed `--mode`, `--pr` flags. Added `--rm` flag.
 - Always starts a develop session
 - `--rm`: auto-remove container + volume when Claude REPL exits
+- Uses `trap` on EXIT/INT/TERM for reliable cleanup when `--rm` is set
 
 **`start`** — removed `--mode`, `--pr` flags.
 - Always starts a develop session
@@ -51,6 +52,8 @@ claude-dev help [command]
 - `--post`: for PR reviews, post the review to GitHub after completion
 - `--keep`: preserve the session after completion (default: auto-remove)
 - Container auto-removes by default (opposite of develop sessions)
+- Always uses `--dangerously-skip-permissions` (non-interactive `claude -p` requires it)
+- If a container with the same name already exists (from a prior `--keep`), it is removed first
 
 ### Removed commands
 
@@ -69,7 +72,19 @@ When `--pr=123` is passed to `run`, the CLI expands it to:
 Use the /review skill to review PR #123. Analyze all changes compared to the base branch. Output your review as markdown.
 ```
 
-The `org/repo#123` format is also supported — the CLI parses the ref and includes repo context in the prompt.
+The `org/repo#123` format is also supported. The CLI parses it:
+
+```bash
+if [[ "$PR_REF" == *"#"* ]]; then
+  PR_REPO="${PR_REF%%#*}"
+  PR_NUM="${PR_REF##*#}"
+else
+  PR_REPO=""
+  PR_NUM="$PR_REF"
+fi
+```
+
+When a repo is specified, the prompt includes `--repo $PR_REPO` context so Claude knows which repo to target.
 
 This expansion happens in the `claude-dev` script on the host. The container receives only `ONE_SHOT_PROMPT`.
 
@@ -80,6 +95,7 @@ The entrypoint no longer validates modes or dispatches to mode scripts. New disp
 ```bash
 if [ -n "${ONE_SHOT_PROMPT:-}" ]; then
   echo ":: Running one-shot prompt..."
+  # One-shot always requires --dangerously-skip-permissions (non-interactive claude -p)
   OUTPUT=$(claude -p --dangerously-skip-permissions "$ONE_SHOT_PROMPT" 2>&1) || {
     echo "ERROR: Claude execution failed"
     echo "$OUTPUT"
@@ -94,12 +110,22 @@ else
 fi
 ```
 
+Note: `--dangerously-skip-permissions` is always used for one-shot because `claude -p` (non-interactive pipe mode) requires it. The `SKIP_PERMISSIONS` env var is no longer needed for one-shot dispatch.
+
 ## `run` Command Implementation
 
 ```bash
 run)
+    # Parse --pr shorthand (supports org/repo#123 format)
     if [ -n "$PR_REF" ]; then
-      PROMPT="Use the /review skill to review PR #$PR_REF. ..."
+      if [[ "$PR_REF" == *"#"* ]]; then
+        PR_REPO="${PR_REF%%#*}"
+        PR_NUM="${PR_REF##*#}"
+        PROMPT="Use the /review skill to review PR #$PR_NUM in repo $PR_REPO. Analyze all changes compared to the base branch. Output your review as markdown."
+      else
+        PR_NUM="$PR_REF"
+        PROMPT="Use the /review skill to review PR #$PR_NUM. Analyze all changes compared to the base branch. Output your review as markdown."
+      fi
     elif [ -n "$PROMPT_ARG" ]; then
       PROMPT="$PROMPT_ARG"
     else
@@ -107,36 +133,72 @@ run)
       exit 1
     fi
 
-    export ONE_SHOT_PROMPT="$PROMPT" SKIP_PERMISSIONS="true"
+    # Clean up any existing container with the same name (from a prior --keep)
+    if container_exists; then
+      docker stop "$CONTAINER_NAME" >/dev/null 2>&1 || true
+      docker rm "$CONTAINER_NAME" >/dev/null 2>&1 || true
+    fi
 
+    export ONE_SHOT_PROMPT="$PROMPT"
+
+    # Run in foreground, blocks until container exits
     $COMPOSE up --abort-on-container-exit
+
+    # Extract output using docker cp (container is stopped after --abort-on-container-exit)
+    OUTPUT_FILE=$(mktemp)
+    docker cp "$CONTAINER_NAME:/workspace/.claude-session/output.md" "$OUTPUT_FILE" 2>/dev/null || true
 
     # Post review if --post and --pr
     if [ "$POST_REVIEW" = "true" ] && [ -n "$PR_REF" ]; then
-      docker exec "$CONTAINER_NAME" gh pr review "$PR_REF" \
-        --comment --body "$(docker exec "$CONTAINER_NAME" cat /workspace/.claude-session/output.md)"
+      if [ -s "$OUTPUT_FILE" ]; then
+        echo ":: Posting review to GitHub..."
+        REVIEW_BODY=$(cat "$OUTPUT_FILE")
+        gh pr review "${PR_NUM}" ${PR_REPO:+--repo "$PR_REPO"} --comment --body "$REVIEW_BODY"
+        echo "  Review posted to PR #${PR_NUM}"
+      else
+        echo "ERROR: No output to post. Check session logs."
+      fi
     fi
+    rm -f "$OUTPUT_FILE"
 
     # Default: auto-remove. --keep to preserve.
     if [ "$KEEP_SESSION" != "true" ]; then
       docker rm "$CONTAINER_NAME" >/dev/null 2>&1 || true
       docker volume rm "$VOLUME_NAME" >/dev/null 2>&1 || true
+      echo ":: Session cleaned up."
+    else
+      echo ":: Session preserved. Start and attach: ./claude-dev start $SESSION_NAME && ./claude-dev attach $SESSION_NAME"
     fi
     ;;
 ```
 
+Key design decisions:
+- Uses `docker cp` instead of `docker exec` to extract output after `--abort-on-container-exit` (the container is stopped at that point)
+- Uses host-side `gh` CLI for posting reviews (avoids needing the container running)
+- Cleans up any existing same-named container before starting
+- `SKIP_PERMISSIONS` env var no longer exported — entrypoint always uses it for one-shot
+
 ## `launch --rm` Implementation
 
-Change `exec docker exec -it ... claude` to a regular call so cleanup runs after:
+Change `exec docker exec -it ... claude` to a regular call so cleanup runs after. Use `trap` for reliable cleanup on signals:
 
 ```bash
+# Set up cleanup trap if --rm
+if [ "$AUTO_REMOVE" = "true" ]; then
+  cleanup_session() {
+    echo ""
+    echo ":: Cleaning up session '$SESSION_NAME'..."
+    docker stop "$CONTAINER_NAME" >/dev/null 2>&1 || true
+    docker rm "$CONTAINER_NAME" >/dev/null 2>&1 || true
+    docker volume rm "$VOLUME_NAME" >/dev/null 2>&1 || true
+    echo ":: Session cleaned up."
+  }
+  trap cleanup_session EXIT
+fi
+
 docker exec -it "$CONTAINER_NAME" claude $CLAUDE_ARGS
 
-if [ "$AUTO_REMOVE" = "true" ]; then
-  docker stop "$CONTAINER_NAME" >/dev/null 2>&1 || true
-  docker rm "$CONTAINER_NAME" >/dev/null 2>&1 || true
-  docker volume rm "$VOLUME_NAME" >/dev/null 2>&1 || true
-fi
+# If not --rm, no trap was set, so nothing happens on exit
 ```
 
 ## Files Removed
@@ -154,10 +216,39 @@ fi
 
 | File | Changes |
 |------|---------|
-| `claude-dev` | Remove `--mode`, rewrite `run`, remove `pr-submit`, add `--rm`/`--keep`/`--post`/`--prompt`, update help |
-| `scripts/entrypoint.sh` | Remove mode validation + dispatch, add `ONE_SHOT_PROMPT` check |
-| `docker-compose.yaml` | Remove `MODE`, `PR_NUMBER`, `PR_REPO`, `DRY_RUN` env vars. Add `ONE_SHOT_PROMPT`. |
-| `CLAUDE.md` | Update docs to reflect new CLI surface |
+| `claude-dev` | Remove `--mode`, rewrite `run`, remove `pr-submit`, add `--rm`/`--keep`/`--post`/`--prompt` to option parser, update help text and `command_help()` |
+| `scripts/entrypoint.sh` | Remove mode validation + dispatch, add `ONE_SHOT_PROMPT` check, remove `MODE` references |
+| `docker-compose.yaml` | Remove `MODE`, `PR_NUMBER`, `PR_REPO`, `DRY_RUN` env vars. Add `ONE_SHOT_PROMPT`. Remove `SKIP_PERMISSIONS`. |
+| `CLAUDE.md` | Update CLI reference, remove mode documentation |
+| `docs/MODES.md` | Remove entirely (mode concept no longer exists) |
+| `docs/ARCHITECTURE.md` | Update to reflect simplified entrypoint flow, remove mode references |
+
+## Option Parser Updates
+
+The option parser (currently lines 263-272 of `claude-dev`) needs these changes:
+
+**Add:**
+- `--prompt=*` → `PROMPT_ARG="${1#--prompt=}"`
+- `--post` → `POST_REVIEW="true"`
+- `--keep` → `KEEP_SESSION="true"`
+- `--rm` → `AUTO_REMOVE="true"`
+
+**Remove:**
+- `--mode=*`
+- `--no-dry-run`
+
+**Defaults:**
+- `POST_REVIEW="false"`
+- `KEEP_SESSION="false"`
+- `AUTO_REMOVE="false"`
+- `PROMPT_ARG=""`
+- `PR_REF=""` (unchanged)
+
+## `status.json` Changes
+
+The session `status.json` currently includes a `"mode"` field. Replace it with a `"type"` field:
+- Develop sessions: `"type": "develop"`
+- One-shot runs: `"type": "one-shot"` (plus `"prompt"` field with the truncated prompt text)
 
 ## Files Unchanged
 
@@ -170,7 +261,10 @@ fi
 
 No test suite exists. Verify by:
 1. `./claude-dev build`
-2. `./claude-dev launch test1` — confirm develop mode works
-3. `./claude-dev launch test2 --rm` — confirm auto-cleanup on exit
-4. `./claude-dev run test3 --prompt "echo hello"` — confirm one-shot works and auto-removes
-5. `./claude-dev run test4 --pr=123 --keep` — confirm PR review shorthand and session preserved
+2. `./claude-dev launch test1` — confirm develop mode works, attach works
+3. `./claude-dev launch test2 --rm` — confirm auto-cleanup on Claude REPL exit
+4. `./claude-dev run test3 --prompt "Respond with only: test successful"` — confirm one-shot works and auto-removes
+5. `./claude-dev run test4 --prompt "Respond with only: test successful" --keep` — confirm session preserved, can attach
+6. `./claude-dev run test5 --pr=123 --keep` — confirm PR review shorthand and session preserved (will fail if no repo, but validates parsing)
+7. `./claude-dev status test4` — confirm status shows type "one-shot"
+8. Verify `--mode` flag is rejected: `./claude-dev launch test6 --mode=develop` should fail
