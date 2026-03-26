@@ -26,8 +26,6 @@ services:
       - ./config:/etc/claude-dev/config:ro
       # Custom CA certificates (optional)
       - ./certs:/etc/claude-dev/certs:ro
-    stdin_open: true
-    tty: true
     mem_limit: 4g
     extra_hosts:
       - "host.docker.internal:host-gateway"
