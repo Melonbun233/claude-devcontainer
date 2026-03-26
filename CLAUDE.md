@@ -35,7 +35,7 @@ There is no test suite. Verify changes by building the image and starting a sess
 3. Copy + rewrite host `~/.claude/settings.json` (`localhost` → `host.docker.internal`)
 4. `setup-git.sh` — authenticate git per server (SSH keys + credential store + gh CLI)
 5. `setup-jira.sh` — validate Jira connection (Cloud v3 or DC v2 API)
-6. `clone-repos.sh` — clone repos with per-server token injection, SSL config, per-repo git identity, branch-scoped cloning
+6. `clone-repos.sh` — clone repos with auth_method-based URL construction, SSL config, per-repo git identity, branch-scoped cloning
 7. `setup-claude-config.sh` — cascade host → built-in → per-repo config
 8. Create `/workspace/.claude-session/` (status.json, output.log)
 9. If `ONE_SHOT_PROMPT` set → run `claude -p`, save output, exit; otherwise → `sleep infinity`
