@@ -733,17 +733,21 @@ case "$COMMAND" in
     ;;
 
   list)
-    FORMAT="table {{.Names}}\t{{.Status}}\t{{.Label \"com.claude-sandbox.session\"}}"
     echo "Sessions:"
     echo ""
-    docker ps -a --filter "label=com.claude-sandbox.session=true" \
-      --format "table {{.Names}}\t{{.Status}}" 2>/dev/null || true
-    # Show if empty
     COUNT=$(docker ps -a --filter "label=com.claude-sandbox.session=true" -q 2>/dev/null | wc -l | tr -d ' ')
     if [ "$COUNT" = "0" ]; then
       echo "  (no sessions)"
       echo ""
       echo "  To start one: ./claude-sandbox start <session-name>"
+    else
+      printf "  %-30s %s\n" "NAME" "STATUS"
+      docker ps -a --filter "label=com.claude-sandbox.session=true" \
+        --format "{{.Names}}\t{{.Status}}" 2>/dev/null | \
+        while IFS=$'\t' read -r name status; do
+          session="${name#claude-sandbox-}"
+          printf "  %-30s %s\n" "$session" "$status"
+        done
     fi
     ;;
 
