@@ -53,8 +53,8 @@ else
   echo "  No host settings.json found."
 fi
 
-echo ":: Setting up GitHub..."
-/scripts/setup-github.sh || echo "WARN: GitHub setup had issues (continuing)"
+echo ":: Setting up Git..."
+/scripts/setup-git.sh || echo "WARN: Git setup had issues (continuing)"
 
 echo ":: Setting up Jira..."
 /scripts/setup-jira.sh || echo "WARN: Jira setup had issues (continuing)"
