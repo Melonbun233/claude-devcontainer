@@ -273,6 +273,33 @@ container_running() {
   [ "$(docker container inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null)" = "true" ]
 }
 
+print_session_exit_message() {
+  local session_name="$1"
+  local mode="$2"  # "launch", "launch-rm", "attach", "run", "run-keep"
+
+  echo ""
+  echo "─────────────────────────────────────────────"
+  case "$mode" in
+    launch-rm|run)
+      echo ":: Session '$session_name' has been removed."
+      ;;
+    launch|attach)
+      echo ":: Session '$session_name' is still running."
+      echo ""
+      echo "  Re-attach:  ./claude-sandbox attach $session_name"
+      echo "  Stop:       ./claude-sandbox stop $session_name"
+      echo "  Delete:     ./claude-sandbox delete $session_name"
+      ;;
+    run-keep)
+      echo ":: Session '$session_name' has been preserved (--keep)."
+      echo ""
+      echo "  Re-attach:  ./claude-sandbox start $session_name && ./claude-sandbox attach $session_name"
+      echo "  Delete:     ./claude-sandbox delete $session_name"
+      ;;
+  esac
+  echo "─────────────────────────────────────────────"
+}
+
 # ── Generate docker-compose.override.yaml from workspace.yaml git_config ────
 generate_compose_override() {
   local CONFIG_FILE="$SCRIPT_DIR/config/workspace.yaml"
@@ -430,7 +457,12 @@ case "$COMMAND" in
       read -rp "Choice [r/d/q]: " choice
       case "$choice" in
         r|R)
-          docker exec -it "$CONTAINER_NAME" claude $CLAUDE_ARGS
+          DOCKER_CLI_HINTS=false docker exec -it "$CONTAINER_NAME" claude $CLAUDE_ARGS || true
+          if [ "$AUTO_REMOVE" = "true" ]; then
+            print_session_exit_message "$SESSION_NAME" "launch-rm"
+          else
+            print_session_exit_message "$SESSION_NAME" "launch"
+          fi
           exit 0
           ;;
         d|D)
@@ -528,7 +560,12 @@ case "$COMMAND" in
 
     echo ""
     echo ":: Attaching to session '$SESSION_NAME'..."
-    docker exec -it "$CONTAINER_NAME" claude $CLAUDE_ARGS
+    DOCKER_CLI_HINTS=false docker exec -it "$CONTAINER_NAME" claude $CLAUDE_ARGS || true
+    if [ "$AUTO_REMOVE" = "true" ]; then
+      print_session_exit_message "$SESSION_NAME" "launch-rm"
+    else
+      print_session_exit_message "$SESSION_NAME" "launch"
+    fi
     ;;
 
   start)
@@ -574,7 +611,8 @@ case "$COMMAND" in
     if [ "$SKIP_PERMISSIONS" = "true" ]; then
       CLAUDE_ARGS="--dangerously-skip-permissions"
     fi
-    docker exec -it "$CONTAINER_NAME" claude $CLAUDE_ARGS
+    DOCKER_CLI_HINTS=false docker exec -it "$CONTAINER_NAME" claude $CLAUDE_ARGS || true
+    print_session_exit_message "$SESSION_NAME" "attach"
     ;;
 
   run)
@@ -633,9 +671,9 @@ case "$COMMAND" in
     if [ "$KEEP_SESSION" != "true" ]; then
       docker rm "$CONTAINER_NAME" >/dev/null 2>&1 || true
       docker volume rm "$VOLUME_NAME" >/dev/null 2>&1 || true
-      echo ":: Session cleaned up."
+      print_session_exit_message "$SESSION_NAME" "run"
     else
-      echo ":: Session preserved. Start and attach: ./claude-sandbox start $SESSION_NAME && ./claude-sandbox attach $SESSION_NAME"
+      print_session_exit_message "$SESSION_NAME" "run-keep"
     fi
     ;;
 
