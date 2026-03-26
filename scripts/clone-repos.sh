@@ -22,7 +22,7 @@ declare -A HOST_TOKENS HOST_USER_NAMES HOST_USER_EMAILS HOST_SSL_VERIFY HOST_AUT
 SERVER_COUNT=$(yq '.github_servers | length' "$CONFIG_FILE" 2>/dev/null || echo 0)
 for i in $(seq 0 $((SERVER_COUNT - 1))); do
   HOST=$(yq ".github_servers[$i].host" "$CONFIG_FILE")
-  TOKEN_ENV=$(yq ".github_servers[$i].token_env" "$CONFIG_FILE")
+  TOKEN_ENV=$(yq ".github_servers[$i].token_env // \"\"" "$CONFIG_FILE")
   TOKEN="${!TOKEN_ENV:-}"
   if [ -n "$TOKEN" ]; then
     HOST_TOKENS["$HOST"]="$TOKEN"
