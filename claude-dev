@@ -284,6 +284,13 @@ generate_compose_override() {
     return 0
   fi
 
+  # yq is required to parse workspace.yaml
+  if ! command -v yq &>/dev/null; then
+    echo "ERROR: 'yq' is required but not found on this machine."
+    echo "  Install: brew install yq (macOS) or see https://github.com/mikefarah/yq"
+    return 1
+  fi
+
   local MOUNT_SSH
   local MOUNT_GITCONFIG
   MOUNT_SSH=$(yq '.git_config.mount_ssh // false' "$CONFIG_FILE" 2>/dev/null)
