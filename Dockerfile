@@ -69,8 +69,8 @@ USER root
 # ── Copy scripts and config ─────────────────────────────────────────────────
 COPY --chown=claude:claude scripts/   /scripts/
 COPY --chown=claude:claude jira-cli/  /usr/local/lib/jira-cli/
-COPY --chown=claude:claude claude-config/ /etc/claude-dev/claude-config/
-COPY --chown=claude:claude templates/ /etc/claude-dev/templates/
+COPY --chown=claude:claude claude-config/ /etc/claude-sandbox/claude-config/
+COPY --chown=claude:claude templates/ /etc/claude-sandbox/templates/
 
 RUN chmod +x /scripts/*.sh \
     && for f in /usr/local/lib/jira-cli/*.sh; do \

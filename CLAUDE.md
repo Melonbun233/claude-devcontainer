@@ -9,17 +9,17 @@ Containerized Claude Code environment (`ubuntu:24.04`) for running `--dangerousl
 ## Build & Run
 
 ```bash
-./claude-dev build                          # docker compose build
-./claude-dev launch <name>                  # start + attach in one step
-./claude-dev launch <name> --rm             # start + attach, auto-cleanup on exit
-./claude-dev start <name>                   # start named session (required)
-./claude-dev attach <name>                  # attach interactively
-./claude-dev run <name> --prompt="<text>"   # run one-shot prompt
-./claude-dev run <name> --pr=123            # run PR review
-./claude-dev stop <name>                    # stop (preserves state)
-./claude-dev delete <name>                  # permanently remove container + volume
-./claude-dev list                           # show all sessions
-./claude-dev help <command>                 # per-command help
+./claude-sandbox build                          # docker compose build
+./claude-sandbox launch <name>                  # start + attach in one step
+./claude-sandbox launch <name> --rm             # start + attach, auto-cleanup on exit
+./claude-sandbox start <name>                   # start named session (required)
+./claude-sandbox attach <name>                  # attach interactively
+./claude-sandbox run <name> --prompt="<text>"   # run one-shot prompt
+./claude-sandbox run <name> --pr=123            # run PR review
+./claude-sandbox stop <name>                    # stop (preserves state)
+./claude-sandbox delete <name>                  # permanently remove container + volume
+./claude-sandbox list                           # show all sessions
+./claude-sandbox help <command>                 # per-command help
 ```
 
 There is no test suite. Verify changes by building the image and starting a session.
@@ -43,9 +43,9 @@ There is no test suite. Verify changes by building the image and starting a sess
 ### Named Sessions
 
 Each session name derives three identifiers:
-- Container: `claude-dev-<name>`
-- Volume: `claude-dev-workspace-<name>`
-- Compose project: `claude-dev-<name>` (via `--project-name`)
+- Container: `claude-sandbox-<name>`
+- Volume: `claude-sandbox-workspace-<name>`
+- Compose project: `claude-sandbox-<name>` (via `--project-name`)
 
 Sessions are isolated — multiple can run simultaneously. `stop` preserves the volume; `delete` removes everything.
 
@@ -68,7 +68,7 @@ Four read-only scripts in `jira-cli/` all source `jira-common.sh` for shared aut
 
 ### Configuration Cascade
 
-Built-in config (baked into image at `/etc/claude-dev/claude-config/`) is installed first, then host config (`/host-config`) is layered on top:
+Built-in config (baked into image at `/etc/claude-sandbox/claude-config/`) is installed first, then host config (`/host-config`) is layered on top:
 - **CLAUDE.md**: host content **appended** to built-in (both preserved)
 - **settings.json**: host values **merged** via `jq -s '.[0] * .[1]'` (host wins)
 - **agents/skills**: host files override built-in if same name
@@ -84,7 +84,7 @@ Per-repo config (`/host-config/repos/<name>/`) is copied to `/workspace/<name>/.
 
 | Path | Purpose |
 |------|---------|
-| `claude-dev` | Host CLI wrapper — session lifecycle, command dispatch |
+| `claude-sandbox` | Host CLI wrapper — session lifecycle, command dispatch |
 | `docker-compose.yaml` | Parameterized service; `env_file: .env` passes all credentials |
 | `scripts/entrypoint.sh` | Container init orchestrator |
 | `scripts/setup-git.sh` | Git auth: SSH config, credential store, gh CLI per server |

@@ -51,7 +51,7 @@ entrypoint.sh
 | `~/.claude.json` | `/home/claude/.claude.json:ro` | Anthropic API config |
 | `~/.claude/settings.json` | `/tmp/.claude.settings.host:ro` | Auth tokens, base URL, model config |
 | `./host-config/` | `/host-config:ro` | CLAUDE.md, agents, skills |
-| `./config/` | `/etc/claude-dev/config:ro` | workspace.yaml |
+| `./config/` | `/etc/claude-sandbox/config:ro` | workspace.yaml |
 | `workspace` (volume) | `/workspace` | Cloned repos (persistent) |
 
 ## Environment Variables
@@ -82,5 +82,5 @@ By default, config is inherited from the host's `~/.claude.json` and `~/.claude/
 | Variable | Set by | Description |
 |----------|--------|-------------|
 | `SESSION_NAME` | positional arg | Session name |
-| `CONTAINER_NAME` | derived | `claude-dev-<session-name>` |
+| `CONTAINER_NAME` | derived | `claude-sandbox-<session-name>` |
 | `ONE_SHOT_PROMPT` | `--prompt=` or `--pr=` | Prompt for one-shot `run` command |

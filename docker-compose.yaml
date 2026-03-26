@@ -1,17 +1,17 @@
 services:
-  claude-dev:
+  claude-sandbox:
     build: .
     image: claude-sandbox:latest
-    container_name: ${CONTAINER_NAME:-claude-dev}
+    container_name: ${CONTAINER_NAME:-claude-sandbox}
     labels:
-      com.claude-dev.session: "true"
+      com.claude-sandbox.session: "true"
     env_file:
       - path: .env
         required: false
     environment:
-      # CLI-driven vars (set by claude-dev wrapper, not .env)
+      # CLI-driven vars (set by claude-sandbox wrapper, not .env)
       - SESSION_NAME=${SESSION_NAME:-default}
-      - CONTAINER_NAME=${CONTAINER_NAME:-claude-dev}
+      - CONTAINER_NAME=${CONTAINER_NAME:-claude-sandbox}
       - ONE_SHOT_PROMPT
     volumes:
       # Host Anthropic config (staged, then copied+modified by entrypoint)
@@ -23,13 +23,13 @@ services:
       # Persistent workspace for cloned repos
       - workspace:/workspace
       # Config files (workspace.yaml)
-      - ./config:/etc/claude-dev/config:ro
+      - ./config:/etc/claude-sandbox/config:ro
       # Custom CA certificates (optional)
-      - ./certs:/etc/claude-dev/certs:ro
+      - ./certs:/etc/claude-sandbox/certs:ro
     mem_limit: 4g
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
 volumes:
   workspace:
-    name: ${VOLUME_NAME:-claude-dev-workspace}
+    name: ${VOLUME_NAME:-claude-sandbox-workspace}

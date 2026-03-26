@@ -3,7 +3,7 @@ set -euo pipefail
 
 # ── Clone repos from workspace.yaml ─────────────────────────────────────────
 
-CONFIG_FILE="/etc/claude-dev/config/workspace.yaml"
+CONFIG_FILE="/etc/claude-sandbox/config/workspace.yaml"
 
 if [ ! -f "$CONFIG_FILE" ]; then
   echo "  No workspace.yaml found, skipping repo cloning."

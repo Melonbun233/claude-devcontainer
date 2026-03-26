@@ -1,6 +1,6 @@
 .PHONY: build start attach stop logs clean status
 
-IMAGE_NAME := claude-dev
+IMAGE_NAME := claude-sandbox
 COMPOSE := docker compose
 
 # Build the container image

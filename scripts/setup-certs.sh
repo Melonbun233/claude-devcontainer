@@ -3,8 +3,8 @@ set -euo pipefail
 
 # ── Install custom CA certificates from workspace.yaml ────────────────────────
 
-CONFIG_FILE="/etc/claude-dev/config/workspace.yaml"
-CERTS_DIR="/etc/claude-dev/certs"
+CONFIG_FILE="/etc/claude-sandbox/config/workspace.yaml"
+CERTS_DIR="/etc/claude-sandbox/certs"
 CA_DEST="/usr/local/share/ca-certificates"
 
 if [ ! -f "$CONFIG_FILE" ]; then
@@ -30,7 +30,7 @@ for i in $(seq 0 $((SERVER_COUNT - 1))); do
   fi
 
   # Copy to system CA store (filename must end in .crt)
-  DEST_NAME="claude-dev-${HOST//[^a-zA-Z0-9._-]/_}.crt"
+  DEST_NAME="claude-sandbox-${HOST//[^a-zA-Z0-9._-]/_}.crt"
   sudo cp "$CERT_FILE" "$CA_DEST/$DEST_NAME"
   echo "  Installed CA cert for $HOST ($CA_CERT)"
   CERTS_INSTALLED=$((CERTS_INSTALLED + 1))

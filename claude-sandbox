@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ── claude-dev — CLI wrapper for claude-sandbox ──────────────────────────────
+# ── claude-sandbox — CLI wrapper for claude-sandbox ──────────────────────────────
 
 COMPOSE="docker compose"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,7 +10,7 @@ cd "$SCRIPT_DIR"
 
 usage() {
   cat <<'EOF'
-Usage: claude-dev <command> <session-name> [options]
+Usage: claude-sandbox <command> <session-name> [options]
 
 A session name is required for all commands (except build, list, help).
 
@@ -27,7 +27,7 @@ Commands:
   list                                 List all sessions
   help [command]                       Show help for a command
 
-Run 'claude-dev help <command>' for detailed help on a specific command.
+Run 'claude-sandbox help <command>' for detailed help on a specific command.
 EOF
 }
 
@@ -35,18 +35,18 @@ command_help() {
   case "${1:-}" in
     build)
       cat <<'EOF'
-Usage: claude-dev build
+Usage: claude-sandbox build
 
 Build (or rebuild) the container image. Run this after pulling updates
 or modifying the Dockerfile.
 
 Examples:
-  claude-dev build
+  claude-sandbox build
 EOF
       ;;
     launch)
       cat <<'EOF'
-Usage: claude-dev launch <session-name> [options]
+Usage: claude-sandbox launch <session-name> [options]
 
 Start a session and immediately attach to Claude Code. If the session
 is already running, you'll be prompted to re-attach or replace it.
@@ -56,14 +56,14 @@ Options:
   --rm                  Auto-remove session when Claude exits
 
 Examples:
-  claude-dev launch my-feature
-  claude-dev launch my-feature --skip-permissions
-  claude-dev launch my-feature --rm
+  claude-sandbox launch my-feature
+  claude-sandbox launch my-feature --skip-permissions
+  claude-sandbox launch my-feature --rm
 EOF
       ;;
     start)
       cat <<'EOF'
-Usage: claude-dev start <session-name> [options]
+Usage: claude-sandbox start <session-name> [options]
 
 Start a new session or restart a stopped one. Each session gets its own
 container and persistent workspace volume.
@@ -75,13 +75,13 @@ If the session was previously stopped, it is restarted with its existing
 workspace data intact.
 
 Examples:
-  claude-dev start my-feature
-  claude-dev start my-feature --skip-permissions
+  claude-sandbox start my-feature
+  claude-sandbox start my-feature --skip-permissions
 EOF
       ;;
     attach)
       cat <<'EOF'
-Usage: claude-dev attach <session-name> [options]
+Usage: claude-sandbox attach <session-name> [options]
 
 Attach to a running session interactively with Claude Code.
 
@@ -91,14 +91,14 @@ Options:
 The session must be running. If stopped, use 'start' to restart it first.
 
 Examples:
-  claude-dev attach my-feature
-  claude-dev attach my-feature --skip-permissions
+  claude-sandbox attach my-feature
+  claude-sandbox attach my-feature --skip-permissions
 EOF
       ;;
     run)
       cat <<'EOF'
-Usage: claude-dev run <session-name> --prompt=<text> [options]
-       claude-dev run <session-name> --pr=<ref> [options]
+Usage: claude-sandbox run <session-name> --prompt=<text> [options]
+       claude-sandbox run <session-name> --pr=<ref> [options]
 
 Run a one-shot prompt in a fresh container. The session is auto-removed
 after completion unless --keep is specified.
@@ -110,76 +110,76 @@ Options:
   --keep                Preserve session for later inspection (default: auto-remove)
 
 Examples:
-  claude-dev run task1 --prompt "Respond with only: test successful"
-  claude-dev run review1 --pr=123
-  claude-dev run review2 --pr=org/repo#456 --post
-  claude-dev run review3 --pr=123 --keep
+  claude-sandbox run task1 --prompt "Respond with only: test successful"
+  claude-sandbox run review1 --pr=123
+  claude-sandbox run review2 --pr=org/repo#456 --post
+  claude-sandbox run review3 --pr=123 --keep
 EOF
       ;;
     status)
       cat <<'EOF'
-Usage: claude-dev status <session-name>
+Usage: claude-sandbox status <session-name>
 
 Show session status including type, start time, and container info.
 For stopped sessions, shows restart/delete instructions.
 
 Examples:
-  claude-dev status my-feature
+  claude-sandbox status my-feature
 EOF
       ;;
     logs)
       cat <<'EOF'
-Usage: claude-dev logs <session-name>
+Usage: claude-sandbox logs <session-name>
 
 Tail the session output log. The session must be running.
 
 Examples:
-  claude-dev logs my-feature
+  claude-sandbox logs my-feature
 EOF
       ;;
     stop)
       cat <<'EOF'
-Usage: claude-dev stop <session-name>
+Usage: claude-sandbox stop <session-name>
 
 Stop a running session. The container and workspace volume are preserved,
 so you can restart it later with 'start'.
 
 Examples:
-  claude-dev stop my-feature
-  claude-dev start my-feature    # restart later
+  claude-sandbox stop my-feature
+  claude-sandbox start my-feature    # restart later
 EOF
       ;;
     delete)
       cat <<'EOF'
-Usage: claude-dev delete <session-name>
+Usage: claude-sandbox delete <session-name>
 
 Permanently remove a session's container and workspace volume. This
 cannot be undone — all cloned repos and session data are lost.
 
 Examples:
-  claude-dev delete my-feature
+  claude-sandbox delete my-feature
 EOF
       ;;
     list)
       cat <<'EOF'
-Usage: claude-dev list
+Usage: claude-sandbox list
 
 List all sessions (running and stopped) with their status.
 
 Examples:
-  claude-dev list
+  claude-sandbox list
 EOF
       ;;
     help)
       cat <<'EOF'
-Usage: claude-dev help [command]
+Usage: claude-sandbox help [command]
 
 Show general help, or detailed help for a specific command.
 
 Examples:
-  claude-dev help
-  claude-dev help start
-  claude-dev help attach
+  claude-sandbox help
+  claude-sandbox help start
+  claude-sandbox help attach
 EOF
       ;;
     "")
@@ -214,9 +214,9 @@ case "$COMMAND" in
     if [ -z "$SESSION_NAME" ]; then
       echo "ERROR: Session name is required."
       echo ""
-      echo "  Usage: claude-dev $COMMAND <session-name> [options]"
+      echo "  Usage: claude-sandbox $COMMAND <session-name> [options]"
       echo ""
-      echo "  Example: claude-dev $COMMAND my-feature"
+      echo "  Example: claude-sandbox $COMMAND my-feature"
       exit 1
     fi
     # Validate session name: must start with letter/digit, then [a-zA-Z0-9._-]
@@ -226,8 +226,8 @@ case "$COMMAND" in
       echo "  Names must start with a letter or digit and contain only"
       echo "  letters, digits, hyphens, underscores, and dots."
       echo ""
-      echo "  Usage: claude-dev $COMMAND <session-name> [options]"
-      echo "  Example: claude-dev $COMMAND my-feature"
+      echo "  Usage: claude-sandbox $COMMAND <session-name> [options]"
+      echo "  Example: claude-sandbox $COMMAND my-feature"
       exit 1
     fi
     shift
@@ -236,9 +236,9 @@ esac
 
 # ── Derive container/volume names from session name ─────────────────────────
 if [ -n "${SESSION_NAME:-}" ]; then
-  CONTAINER_NAME="claude-dev-${SESSION_NAME}"
-  VOLUME_NAME="claude-dev-workspace-${SESSION_NAME}"
-  COMPOSE="$COMPOSE --project-name claude-dev-${SESSION_NAME}"
+  CONTAINER_NAME="claude-sandbox-${SESSION_NAME}"
+  VOLUME_NAME="claude-sandbox-workspace-${SESSION_NAME}"
+  COMPOSE="$COMPOSE --project-name claude-sandbox-${SESSION_NAME}"
   export CONTAINER_NAME SESSION_NAME VOLUME_NAME
 fi
 
@@ -338,9 +338,9 @@ generate_compose_override() {
   # Generate override file only if mounts are needed
   if [ "$MOUNT_SSH" = "true" ] || [ "$MOUNT_GITCONFIG" = "true" ]; then
     {
-      echo "# Generated by claude-dev — do not edit"
+      echo "# Generated by claude-sandbox — do not edit"
       echo "services:"
-      echo "  claude-dev:"
+      echo "  claude-sandbox:"
       echo "    volumes:"
       if [ "$MOUNT_SSH" = "true" ]; then
         echo "      - ${HOME}/.ssh:/home/claude/.ssh:ro"
@@ -498,8 +498,8 @@ case "$COMMAND" in
     if container_running; then
       echo "ERROR: Session '$SESSION_NAME' is already running."
       echo ""
-      echo "  To attach:  ./claude-dev attach $SESSION_NAME"
-      echo "  To stop:    ./claude-dev stop $SESSION_NAME"
+      echo "  To attach:  ./claude-sandbox attach $SESSION_NAME"
+      echo "  To stop:    ./claude-sandbox stop $SESSION_NAME"
       exit 1
     fi
 
@@ -514,7 +514,7 @@ case "$COMMAND" in
 
     echo ""
     echo "Session '$SESSION_NAME' started."
-    echo "Attach with:  ./claude-dev attach $SESSION_NAME"
+    echo "Attach with:  ./claude-sandbox attach $SESSION_NAME"
     ;;
 
   attach)
@@ -522,13 +522,13 @@ case "$COMMAND" in
       if container_exists; then
         echo "ERROR: Session '$SESSION_NAME' is stopped."
         echo ""
-        echo "  To restart: ./claude-dev start $SESSION_NAME"
+        echo "  To restart: ./claude-sandbox start $SESSION_NAME"
         exit 1
       else
         echo "ERROR: Session '$SESSION_NAME' does not exist."
         echo ""
-        echo "  To create:  ./claude-dev start $SESSION_NAME"
-        echo "  To list:    ./claude-dev list"
+        echo "  To create:  ./claude-sandbox start $SESSION_NAME"
+        echo "  To list:    ./claude-sandbox list"
         exit 1
       fi
     fi
@@ -556,8 +556,8 @@ case "$COMMAND" in
       echo "ERROR: --prompt=<text> or --pr=<ref> is required for run."
       echo ""
       echo "  Examples:"
-      echo "    ./claude-dev run $SESSION_NAME --prompt=\"Respond with: hello\""
-      echo "    ./claude-dev run $SESSION_NAME --pr=123"
+      echo "    ./claude-sandbox run $SESSION_NAME --prompt=\"Respond with: hello\""
+      echo "    ./claude-sandbox run $SESSION_NAME --pr=123"
       exit 1
     fi
 
@@ -597,7 +597,7 @@ case "$COMMAND" in
       docker volume rm "$VOLUME_NAME" >/dev/null 2>&1 || true
       echo ":: Session cleaned up."
     else
-      echo ":: Session preserved. Start and attach: ./claude-dev start $SESSION_NAME && ./claude-dev attach $SESSION_NAME"
+      echo ":: Session preserved. Start and attach: ./claude-sandbox start $SESSION_NAME && ./claude-sandbox attach $SESSION_NAME"
     fi
     ;;
 
@@ -611,8 +611,8 @@ case "$COMMAND" in
     else
       echo "Session '$SESSION_NAME' is stopped."
       echo ""
-      echo "  To restart: ./claude-dev start $SESSION_NAME"
-      echo "  To delete:  ./claude-dev delete $SESSION_NAME"
+      echo "  To restart: ./claude-sandbox start $SESSION_NAME"
+      echo "  To delete:  ./claude-sandbox delete $SESSION_NAME"
     fi
     ;;
 
@@ -632,15 +632,15 @@ case "$COMMAND" in
     docker stop "$CONTAINER_NAME" >/dev/null
     echo "Session '$SESSION_NAME' stopped."
     echo ""
-    echo "  To restart: ./claude-dev start $SESSION_NAME"
-    echo "  To delete:  ./claude-dev delete $SESSION_NAME"
+    echo "  To restart: ./claude-sandbox start $SESSION_NAME"
+    echo "  To delete:  ./claude-sandbox delete $SESSION_NAME"
     ;;
 
   delete)
     if ! container_exists; then
       echo "ERROR: Session '$SESSION_NAME' does not exist."
       echo ""
-      echo "  To list sessions: ./claude-dev list"
+      echo "  To list sessions: ./claude-sandbox list"
       exit 1
     fi
     # Stop if running
@@ -657,17 +657,17 @@ case "$COMMAND" in
     ;;
 
   list)
-    FORMAT="table {{.Names}}\t{{.Status}}\t{{.Label \"com.claude-dev.session\"}}"
+    FORMAT="table {{.Names}}\t{{.Status}}\t{{.Label \"com.claude-sandbox.session\"}}"
     echo "Sessions:"
     echo ""
-    docker ps -a --filter "label=com.claude-dev.session=true" \
+    docker ps -a --filter "label=com.claude-sandbox.session=true" \
       --format "table {{.Names}}\t{{.Status}}" 2>/dev/null || true
     # Show if empty
-    COUNT=$(docker ps -a --filter "label=com.claude-dev.session=true" -q 2>/dev/null | wc -l | tr -d ' ')
+    COUNT=$(docker ps -a --filter "label=com.claude-sandbox.session=true" -q 2>/dev/null | wc -l | tr -d ' ')
     if [ "$COUNT" = "0" ]; then
       echo "  (no sessions)"
       echo ""
-      echo "  To start one: ./claude-dev start <session-name>"
+      echo "  To start one: ./claude-sandbox start <session-name>"
     fi
     ;;
 

@@ -5,7 +5,7 @@ set -euo pipefail
 
 HOST_CONFIG="/host-config"
 CLAUDE_HOME="$HOME/.claude"
-BUILTIN_CONFIG="/etc/claude-dev/claude-config"
+BUILTIN_CONFIG="/etc/claude-sandbox/claude-config"
 
 # ── Step 1: Install built-in defaults ─────────────────────────────────────────
 

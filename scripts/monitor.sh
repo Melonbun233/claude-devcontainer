@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ── Session monitor ──────────────────────────────────────────────────────────
-# Reads session status and displays it. Called by `claude-dev status`.
+# Reads session status and displays it. Called by `claude-sandbox status`.
 
 SESSION_DIR="/workspace/.claude-session"
 STATUS_FILE="$SESSION_DIR/status.json"

@@ -5,7 +5,7 @@ set -euo pipefail
 # Replaces setup-github.sh. Handles both HTTPS (git-credential-store) and
 # SSH (key config + keyscan) per server, plus host gitconfig copying.
 
-CONFIG_FILE="/etc/claude-dev/config/workspace.yaml"
+CONFIG_FILE="/etc/claude-sandbox/config/workspace.yaml"
 
 # ── Host gitconfig (runs first) ──────────────────────────────────────────────
 if [ -f "$HOME/.gitconfig.host" ]; then
