@@ -54,9 +54,10 @@ Sessions are isolated — multiple can run simultaneously. `stop` preserves the 
 `workspace.yaml` defines a `github_servers[]` list. Each entry has `host`, `token_env` (env var name holding the PAT), `auth_method: ssh|https`, optional `user_name`/`user_email`, and optional SSL config (`ssl_verify: false` or `ca_cert: path`).
 
 - **HTTPS**: tokens written to git-credential-store; `gh` CLI configured as a secondary credential helper per server.
-- **SSH**: opt-in mount of host `~/.ssh`; SSH config generated per server with `IdentityFile` routing; `known_hosts` populated via `ssh-keyscan` at startup.
+- **SSH (agent forwarding)**: opt-in via `git_config.ssh_agent: true`. Forwards the host SSH agent socket into the container — recommended for passphrase-protected keys and macOS Keychain. See `docs/SSH-AGENT.md`.
+- **SSH (key files)**: opt-in via `git_config.mount_ssh: true`. Mounts host `~/.ssh` read-only; SSH config generated per server with `IdentityFile` routing. Keys must not require a passphrase.
 
-`docker-compose.override.yaml` is generated at runtime by the CLI for conditional SSH/gitconfig volume mounts (gitignored). Per-server identity and SSL config are handled the same way regardless of auth method.
+`docker-compose.override.yaml` is generated at runtime by the CLI for conditional SSH/gitconfig/agent volume mounts (gitignored). Per-server identity and SSL config are handled the same way regardless of auth method.
 
 ### Jira CLI
 

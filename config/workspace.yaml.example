@@ -1,14 +1,15 @@
 # ── Git Configuration (optional) ─────────────────────────────────────────────
-# Control how the container accesses git. Both options are opt-in.
+# Control how the container accesses git. All options are opt-in.
 # git_config:
-#   mount_ssh: true           # mount host ~/.ssh/ read-only into container
+#   ssh_agent: true           # forward host SSH agent socket (for passphrase-protected keys)
+#   mount_ssh: true           # mount host ~/.ssh/ read-only (for unencrypted key files)
 #   mount_gitconfig: true     # mount host ~/.gitconfig read-only into container
 
 # ── GitHub Servers ────────────────────────────────────────────────────────────
 # Each entry defines a hostname and how to authenticate.
 #
 # auth_method: https (default) — uses PAT via git-credential-store
-# auth_method: ssh — uses SSH keys (requires git_config.mount_ssh: true)
+# auth_method: ssh — uses SSH keys (requires git_config.ssh_agent or mount_ssh)
 #
 # SSL options (for GitHub Enterprise with corporate/self-signed certs):
 #   ssl_verify: false     — skip TLS certificate verification
@@ -21,9 +22,11 @@ github_servers:
     # user_email: jane@personal.com
 
   # SSH example for enterprise server:
+  # When using auth_method: ssh, enable either ssh_agent: true (recommended)
+  # or mount_ssh: true in git_config above.
   # - host: github.enterprise.corp.com
   #   auth_method: ssh
-  #   ssh_key: id_ed25519_work   # optional: filename in ~/.ssh/
+  #   ssh_key: id_ed25519_work   # optional: filename in ~/.ssh/ (requires mount_ssh)
   #   ssh_port: 22               # optional: non-standard SSH port
   #   token_env: GH_ENTERPRISE_TOKEN  # optional for SSH: enables gh CLI
   #   user_name: Jane Doe
