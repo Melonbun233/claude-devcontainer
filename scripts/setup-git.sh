@@ -193,7 +193,7 @@ done
 
 # Set core.sshCommand globally if we have any generated SSH config or sanitized host config
 if [ -f "$HOME/.ssh-generated/known_hosts" ] || [ -f "$HOME/.ssh-generated/config" ] || [ -n "$HOST_SSH_CONFIG" ]; then
-  SSH_CMD="ssh"
+  SSH_CMD="ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes"
   if [ -f "$HOME/.ssh-generated/known_hosts" ]; then
     SSH_CMD="$SSH_CMD -o UserKnownHostsFile=$HOME/.ssh-generated/known_hosts"
   fi
