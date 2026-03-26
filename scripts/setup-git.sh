@@ -15,6 +15,17 @@ else
   echo "  No host gitconfig mounted, skipping."
 fi
 
+# ── Sanitize host SSH config (strip macOS-specific options for Linux) ────────
+if [ -f "$HOME/.ssh/config" ]; then
+  mkdir -p "$HOME/.ssh-generated"
+  sed -E '/^\s*(UseKeychain|AddKeysToAgent)/Id' \
+    "$HOME/.ssh/config" > "$HOME/.ssh-generated/host-config"
+  echo "  Host SSH config sanitized (macOS options stripped)."
+  HOST_SSH_CONFIG="$HOME/.ssh-generated/host-config"
+else
+  HOST_SSH_CONFIG=""
+fi
+
 if [ ! -f "$CONFIG_FILE" ]; then
   echo "  No workspace.yaml found, skipping git setup."
   exit 0
@@ -131,8 +142,12 @@ Host $HOST
     IdentityFile /home/claude/.ssh/$SSH_KEY
     IdentitiesOnly yes
 EOF
-        # Include the generated config
-        git config --global core.sshCommand "ssh -F $HOME/.ssh-generated/config -F /home/claude/.ssh/config"
+        # Include the generated config (plus sanitized host config if available)
+        if [ -n "$HOST_SSH_CONFIG" ]; then
+          git config --global core.sshCommand "ssh -F $HOME/.ssh-generated/config -F $HOST_SSH_CONFIG"
+        else
+          git config --global core.sshCommand "ssh -F $HOME/.ssh-generated/config"
+        fi
       fi
     fi
 
@@ -176,16 +191,17 @@ EOF
   fi
 done
 
-# Set GIT_SSH_COMMAND globally if we generated SSH config
-if [ -f "$HOME/.ssh-generated/known_hosts" ]; then
-  # Build the SSH command with all generated config
-  SSH_CMD="ssh -o UserKnownHostsFile=$HOME/.ssh-generated/known_hosts"
+# Set core.sshCommand globally if we have any generated SSH config or sanitized host config
+if [ -f "$HOME/.ssh-generated/known_hosts" ] || [ -f "$HOME/.ssh-generated/config" ] || [ -n "$HOST_SSH_CONFIG" ]; then
+  SSH_CMD="ssh"
+  if [ -f "$HOME/.ssh-generated/known_hosts" ]; then
+    SSH_CMD="$SSH_CMD -o UserKnownHostsFile=$HOME/.ssh-generated/known_hosts"
+  fi
   if [ -f "$HOME/.ssh-generated/config" ]; then
     SSH_CMD="$SSH_CMD -F $HOME/.ssh-generated/config"
-    # Also include the mounted config if it exists
-    if [ -f "/home/claude/.ssh/config" ]; then
-      SSH_CMD="$SSH_CMD -F /home/claude/.ssh/config"
-    fi
+  fi
+  if [ -n "$HOST_SSH_CONFIG" ]; then
+    SSH_CMD="$SSH_CMD -F $HOST_SSH_CONFIG"
   fi
   git config --global core.sshCommand "$SSH_CMD"
 fi
