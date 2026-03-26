@@ -209,6 +209,13 @@ fi
 # ── SSH agent verification ──────────────────────────────────────────────────
 if [ -n "${SSH_AUTH_SOCK:-}" ]; then
   echo "  Verifying SSH agent..."
+
+  # Fix socket permissions — Docker Desktop (macOS) mounts the proxied socket
+  # as root:root with 0660, which the non-root claude user cannot access.
+  if [ -S "$SSH_AUTH_SOCK" ] && [ ! -r "$SSH_AUTH_SOCK" ]; then
+    sudo chmod 666 "$SSH_AUTH_SOCK" 2>/dev/null || true
+  fi
+
   set +e
   ssh-add -l > /dev/null 2>&1
   AGENT_EXIT=$?
