@@ -18,7 +18,7 @@ if [ "$REPO_COUNT" -eq 0 ]; then
 fi
 
 # Build maps of host → token, identity, and SSL config from github_servers
-declare -A HOST_TOKENS HOST_USER_NAMES HOST_USER_EMAILS HOST_SSL_VERIFY
+declare -A HOST_TOKENS HOST_USER_NAMES HOST_USER_EMAILS HOST_SSL_VERIFY HOST_AUTH_METHODS HOST_SSH_PORTS
 SERVER_COUNT=$(yq '.github_servers | length' "$CONFIG_FILE" 2>/dev/null || echo 0)
 for i in $(seq 0 $((SERVER_COUNT - 1))); do
   HOST=$(yq ".github_servers[$i].host" "$CONFIG_FILE")
@@ -34,6 +34,10 @@ for i in $(seq 0 $((SERVER_COUNT - 1))); do
   SSL_VERIFY=$(yq ".github_servers[$i].ssl_verify" "$CONFIG_FILE")
   if [ "$SSL_VERIFY" != "false" ]; then SSL_VERIFY="true"; fi
   HOST_SSL_VERIFY["$HOST"]="$SSL_VERIFY"
+  AUTH_METHOD=$(yq ".github_servers[$i].auth_method // \"https\"" "$CONFIG_FILE")
+  HOST_AUTH_METHODS["$HOST"]="$AUTH_METHOD"
+  SSH_PORT=$(yq ".github_servers[$i].ssh_port // \"22\"" "$CONFIG_FILE")
+  HOST_SSH_PORTS["$HOST"]="$SSH_PORT"
 done
 
 CLONE_ERRORS=0
@@ -53,18 +57,46 @@ for i in $(seq 0 $((REPO_COUNT - 1))); do
 
   if [ -d "$DEST/.git" ]; then
     echo "  $TARGET: already cloned, pulling latest..."
+
+    # Rewrite stale token-injected remote URLs
+    CURRENT_URL=$(git -C "$DEST" remote get-url origin 2>/dev/null || echo "")
+    if [[ "$CURRENT_URL" == *"x-access-token:"* ]]; then
+      AUTH_METHOD="${HOST_AUTH_METHODS[$REPO_HOST]:-https}"
+      if [ "$AUTH_METHOD" = "ssh" ]; then
+        REPO_PATH=$(echo "$URL" | sed -E 's|https?://[^/]+/(.*)|\1|; s|\.git$||')
+        SSH_PORT="${HOST_SSH_PORTS[$REPO_HOST]:-22}"
+        if [ "$SSH_PORT" != "22" ]; then
+          NEW_URL="ssh://git@${REPO_HOST}:${SSH_PORT}/${REPO_PATH}.git"
+        else
+          NEW_URL="git@${REPO_HOST}:${REPO_PATH}.git"
+        fi
+      else
+        NEW_URL="$URL"
+      fi
+      git -C "$DEST" remote set-url origin "$NEW_URL"
+      echo "    Remote URL rewritten (removed embedded credentials)"
+    fi
+
     if [ "$SSL_VERIFY" = "false" ]; then
       GIT_SSL_NO_VERIFY=true git -C "$DEST" pull --ff-only 2>&1 | sed 's/^/    /' || true
     else
       git -C "$DEST" pull --ff-only 2>&1 | sed 's/^/    /' || true
     fi
   else
+    AUTH_METHOD="${HOST_AUTH_METHODS[$REPO_HOST]:-https}"
     TOKEN="${HOST_TOKENS[$REPO_HOST]:-}"
 
-    # Inject token into URL for private repos
-    if [ -n "$TOKEN" ]; then
-      CLONE_URL=$(echo "$URL" | sed -E "s|https?://|https://x-access-token:${TOKEN}@|")
+    if [ "$AUTH_METHOD" = "ssh" ]; then
+      # Convert https://host/org/repo → git@host:org/repo.git
+      REPO_PATH=$(echo "$URL" | sed -E 's|https?://[^/]+/(.*)|\1|; s|\.git$||')
+      SSH_PORT="${HOST_SSH_PORTS[$REPO_HOST]:-22}"
+      if [ "$SSH_PORT" != "22" ]; then
+        CLONE_URL="ssh://git@${REPO_HOST}:${SSH_PORT}/${REPO_PATH}.git"
+      else
+        CLONE_URL="git@${REPO_HOST}:${REPO_PATH}.git"
+      fi
     else
+      # HTTPS — no token in URL, credential store handles auth
       CLONE_URL="$URL"
     fi
 
