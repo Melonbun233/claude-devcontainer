@@ -71,9 +71,13 @@ ssh-add -l
 
 You can enable both `ssh_agent: true` and `mount_ssh: true`. When a server specifies `ssh_key: id_ed25519_work`, that specific key file is used via `IdentityFile` + `IdentitiesOnly`. All other servers use the agent.
 
+## Host Key Verification
+
+The container automatically runs `ssh-keyscan` for each server in `github_servers` at startup, populating `~/.ssh-generated/known_hosts`. You do not need to accept host keys manually.
+
 ## Platform Notes
 
-**macOS:** Docker Desktop for Mac runs containers inside a Linux VM. Socket forwarding works because Docker Desktop intercepts the host-side path and creates a proxy socket inside the VM. If agent forwarding fails, test Docker socket forwarding:
+**macOS:** Docker Desktop for Mac runs containers inside a Linux VM. Socket forwarding works because Docker Desktop intercepts the host-side path and creates a proxy socket inside the VM. The proxied socket is mounted as `root:root 0660`; the container automatically fixes permissions (`chmod 666`) at startup so the non-root `claude` user can access it. If agent forwarding fails, test Docker socket forwarding:
 ```bash
 docker run --rm -v ${SSH_AUTH_SOCK}:/run/test.sock alpine ls -la /run/test.sock
 ```
@@ -90,6 +94,7 @@ docker run --rm -v ${SSH_AUTH_SOCK}:/run/test.sock alpine ls -la /run/test.sock
 | **"SSH_AUTH_SOCK is not set" on macOS** | macOS auto-starts an agent. Try `ssh-add -l`. If it fails: `eval "$(ssh-agent -s)"` then `ssh-add --apple-use-keychain`. |
 | **"SSH_AUTH_SOCK is not set" on Linux** | Add `eval "$(ssh-agent -s)"` to `~/.bashrc`/`~/.zshrc`, then `ssh-add`. |
 | **Agent works on host, not in container** | Run `docker run --rm -v ${SSH_AUTH_SOCK}:/run/test.sock alpine ls -la /run/test.sock` to test Docker socket forwarding. On macOS, ensure Docker Desktop resource sharing is enabled. |
+| **"Permission denied" on socket (macOS)** | Docker Desktop mounts the proxied socket as `root:root 0660`. The container auto-fixes this at startup. If it still fails, check that the `claude` user has `sudo` access. |
 | **"Agent connected but no keys loaded"** | Run `ssh-add` on the host to load your key. Hardware tokens may show no keys until first use. |
 | **FIDO2/hardware key needing touch** | Not supported in container (`BatchMode=yes` prevents prompts). Pre-authorize with `ssh-add` (without `-c`) before starting. |
 | **"Permission denied" in debug logs despite agent working** | Normal when both `mount_ssh` and `ssh_agent` are enabled. SSH tries key files first (may fail), then agent succeeds. |
