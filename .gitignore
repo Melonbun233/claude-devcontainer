@@ -29,6 +29,7 @@ Thumbs.db
 
 # Docker
 .docker/
+docker-compose.override.yaml
 
 # Claude Code
 .claude/
