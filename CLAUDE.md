@@ -33,7 +33,7 @@ There is no test suite. Verify changes by building the image and starting a sess
 1. `setup-certs.sh` — install custom CA certificates from `workspace.yaml` `ca_cert` paths
 2. Copy + patch host `~/.claude.json` (pre-accept `/workspace` trust)
 3. Copy + rewrite host `~/.claude/settings.json` (`localhost` → `host.docker.internal`)
-4. `setup-github.sh` — authenticate `gh` CLI per server (supports `ssl_verify: false`)
+4. `setup-git.sh` — authenticate git per server (SSH keys + credential store + gh CLI)
 5. `setup-jira.sh` — validate Jira connection (Cloud v3 or DC v2 API)
 6. `clone-repos.sh` — clone repos with per-server token injection, SSL config, per-repo git identity, branch-scoped cloning
 7. `setup-claude-config.sh` — cascade host → built-in → per-repo config
@@ -51,7 +51,12 @@ Sessions are isolated — multiple can run simultaneously. `stop` preserves the 
 
 ### Multi-Server GitHub Auth
 
-`workspace.yaml` defines a `github_servers[]` list. Each entry has `host`, `token_env` (env var name holding the PAT), optional `user_name`/`user_email`, and optional SSL config (`ssl_verify: false` or `ca_cert: path`). The clone script builds `HOST_TOKENS` / `HOST_USER_NAMES` / `HOST_USER_EMAILS` / `HOST_SSL_VERIFY` associative arrays, then routes by matching repo URL hostname.
+`workspace.yaml` defines a `github_servers[]` list. Each entry has `host`, `token_env` (env var name holding the PAT), `auth_method: ssh|https`, optional `user_name`/`user_email`, and optional SSL config (`ssl_verify: false` or `ca_cert: path`).
+
+- **HTTPS**: tokens written to git-credential-store; `gh` CLI configured as a secondary credential helper per server.
+- **SSH**: opt-in mount of host `~/.ssh`; SSH config generated per server with `IdentityFile` routing; `known_hosts` populated via `ssh-keyscan` at startup.
+
+`docker-compose.override.yaml` is generated at runtime by the CLI for conditional SSH/gitconfig volume mounts (gitignored). Per-server identity and SSL config are handled the same way regardless of auth method.
 
 ### Jira CLI
 
@@ -82,7 +87,8 @@ Per-repo config (`/host-config/repos/<name>/`) is copied to `/workspace/<name>/.
 | `claude-dev` | Host CLI wrapper — session lifecycle, command dispatch |
 | `docker-compose.yaml` | Parameterized service; `env_file: .env` passes all credentials |
 | `scripts/entrypoint.sh` | Container init orchestrator |
-| `scripts/setup-*.sh` | GitHub auth, Jira validation, repo cloning, config cascade |
+| `scripts/setup-git.sh` | Git auth: SSH config, credential store, gh CLI per server |
+| `docker-compose.override.yaml` | Generated at runtime by CLI for conditional SSH/gitconfig mounts (gitignored) |
 | `jira-cli/jira-common.sh` | Shared Jira auth/HTTP library |
 | `jira-cli/jira-*.sh` | Query scripts (get-issue, search, get-subtasks, get-sprint) |
 | `config/workspace.yaml` | User's GitHub servers + repos (gitignored) |

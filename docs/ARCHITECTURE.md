@@ -34,7 +34,7 @@
 ```
 entrypoint.sh
   ├── setup-certs.sh        # Install custom CA certificates
-  ├── setup-github.sh       # Auth gh CLI per server in workspace.yaml
+  ├── setup-git.sh          # Configure git auth (SSH keys, credential store, gh CLI) per server
   ├── setup-jira.sh         # Validate Jira connection
   ├── clone-repos.sh        # Clone repos from workspace.yaml
   ├── setup-claude-config.sh # Install built-in config, layer host overrides
