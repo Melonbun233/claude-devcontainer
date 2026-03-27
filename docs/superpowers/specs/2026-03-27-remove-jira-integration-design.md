@@ -67,6 +67,7 @@ Remove:
 - "read-only Jira integration" from project description
 - "(Optional) Jira API token" from prerequisites
 - Jira configuration section with env var examples
+- "Jira, " from the config cascade description ("The container ships with a built-in CLAUDE.md (GitHub, Jira, gstack, superpowers instructions)...")
 
 ### docs/ARCHITECTURE.md
 
