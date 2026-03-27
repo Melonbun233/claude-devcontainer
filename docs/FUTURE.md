@@ -17,21 +17,6 @@ Semi-autonomous mode with acceptance criteria:
 - Interrupt/resume via sentinel files
 - File-based session control (interrupt, guidance, status)
 
-## Jira Write Operations
-
-Extend the Jira CLI with write capabilities:
-- `jira-update-issue <KEY> <field> <value>` — update issue fields
-- `jira-add-comment <KEY> "<text>"` — add comments
-- `jira-transition <KEY> <status>` — transition issue status
-
-## Jira User Story Workflow
-
-Structure work based on Jira hierarchy:
-- Read Epic → User Stories → Subtasks
-- Auto-generate implementation plan from story
-- Create subtasks for implementation phases
-- Update status as work progresses
-
 ## Kubernetes Deployment
 
 Run containers as K8s Jobs/CronJobs:

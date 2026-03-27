@@ -9,16 +9,16 @@
 │  ~/.claude.json ──────────┐  (API keys, base URL, auth)         │
 │  host-config/ ────────────┤  (CLAUDE.md, agents, skills)        │
 │  config/workspace.yaml ───┤  (repos, GitHub servers)            │
-│  .env ────────────────────┤  (tokens, Jira creds)               │
+│  .env ────────────────────┤  (tokens)                            │
 │                           │                                      │
 │  ┌────────────────────────▼─────────────────────────────────┐   │
 │  │  Docker Container (ubuntu:24.04)                          │   │
 │  │                                                           │   │
-│  │  ┌─────────────┐  ┌──────────┐  ┌──────────────────┐    │   │
-│  │  │ Claude Code  │  │ gh CLI   │  │ jira-* scripts   │    │   │
-│  │  │ (interactive │  │ (GitHub  │  │ (Jira REST API   │    │   │
-│  │  │  or -p mode) │  │  ops)    │  │  read-only)      │    │   │
-│  │  └─────────────┘  └──────────┘  └──────────────────┘    │   │
+│  │  ┌─────────────┐  ┌──────────┐                           │   │
+│  │  │ Claude Code  │  │ gh CLI   │                           │   │
+│  │  │ (interactive │  │ (GitHub  │                           │   │
+│  │  │  or -p mode) │  │  ops)    │                           │   │
+│  │  └─────────────┘  └──────────┘                           │   │
 │  │                                                           │   │
 │  │  /workspace/          ← cloned repos                      │   │
 │  │  /workspace/.claude-session/  ← session state             │   │
@@ -35,7 +35,6 @@
 entrypoint.sh
   ├── setup-certs.sh        # Install custom CA certificates
   ├── setup-git.sh          # Configure git auth (SSH keys, credential store, gh CLI) per server
-  ├── setup-jira.sh         # Validate Jira connection
   ├── clone-repos.sh        # Clone repos from workspace.yaml
   ├── setup-claude-config.sh # Install built-in config, layer host overrides
   ├── create session dir    # /workspace/.claude-session/
@@ -62,10 +61,6 @@ entrypoint.sh
 |----------|----------|-------------|
 | `GH_TOKEN` | For GitHub.com | GitHub.com PAT |
 | `GH_ENTERPRISE_TOKEN` | For GHE | Enterprise server PAT (name in workspace.yaml) |
-| `JIRA_URL` | For Jira | Jira instance URL |
-| `JIRA_USERNAME` | For Jira Cloud | Email for Cloud, username for DC |
-| `JIRA_API_TOKEN` | For Jira | API token (Cloud) or PAT (DC) |
-| `JIRA_AUTH_TYPE` | No | `cloud` (default) or `datacenter` |
 
 ### Anthropic / LLM Proxy (optional overrides in `.env`)
 

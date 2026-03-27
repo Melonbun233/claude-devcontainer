@@ -1,13 +1,12 @@
 # claude-sandbox
 
-Isolated, containerized environment for Claude Code — built for DevOps, developers, and CI/CD pipelines. Ships with GitHub Enterprise multi-server auth, read-only Jira integration, credential isolation, and pre-installed AI development skills.
+Isolated, containerized environment for Claude Code — built for DevOps, developers, and CI/CD pipelines. Ships with GitHub Enterprise multi-server auth, credential isolation, and pre-installed AI development skills.
 
 ## Prerequisites
 
 - Docker and Docker Compose
 - Claude Code authenticated on your host machine (`~/.claude.json`)
 - GitHub PAT(s) for your GitHub server(s)
-- (Optional) Jira API token
 
 ## Quick Start
 
@@ -172,17 +171,6 @@ github_servers:
 
 The cert file is installed into the container's system CA store at startup, making it trusted for git, gh CLI, curl, and Node.js.
 
-### Jira (Read-Only)
-
-Set in `.env`:
-
-```
-JIRA_URL=https://mycompany.atlassian.net
-JIRA_USERNAME=you@company.com
-JIRA_API_TOKEN=your-api-token
-JIRA_AUTH_TYPE=cloud   # or "datacenter" for Jira DC/Server
-```
-
 ### Host Configuration
 
 Mount your custom CLAUDE.md, agents, skills, and settings by placing them in `host-config/`:
@@ -200,7 +188,7 @@ host-config/
         └── skills/
 ```
 
-The container ships with a built-in `CLAUDE.md` (GitHub, Jira, gstack, superpowers instructions) and `settings.json` (permissions allowlist). Your host config is layered on top:
+The container ships with a built-in `CLAUDE.md` (GitHub, gstack, superpowers instructions) and `settings.json` (permissions allowlist). Your host config is layered on top:
 - **CLAUDE.md**: host content is **appended** to the built-in (both are preserved)
 - **settings.json**: host values are **merged** with built-in defaults (host wins on conflicts)
 

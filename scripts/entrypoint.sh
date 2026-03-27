@@ -56,9 +56,6 @@ fi
 echo ":: Setting up Git..."
 /scripts/setup-git.sh || echo "WARN: Git setup had issues (continuing)"
 
-echo ":: Setting up Jira..."
-/scripts/setup-jira.sh || echo "WARN: Jira setup had issues (continuing)"
-
 echo ":: Cloning repos..."
 /scripts/clone-repos.sh || echo "WARN: Repo cloning had issues (continuing)"
 

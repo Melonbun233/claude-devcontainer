@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Isolated, containerized Claude Code environment (`ubuntu:24.04`) for DevOps, developers, and CI/CD pipelines. Provides credential isolation, GitHub Enterprise multi-server auth, read-only Jira integration, and pre-installed skills (gstack + superpowers).
+Isolated, containerized Claude Code environment (`ubuntu:24.04`) for DevOps, developers, and CI/CD pipelines. Provides credential isolation, GitHub Enterprise multi-server auth, and pre-installed skills (gstack + superpowers).
 
 ## Build & Run
 
@@ -34,11 +34,10 @@ There is no test suite. Verify changes by building the image and starting a sess
 2. Copy + patch host `~/.claude.json` (pre-accept `/workspace` trust)
 3. Copy + rewrite host `~/.claude/settings.json` (`localhost` → `host.docker.internal`)
 4. `setup-git.sh` — authenticate git per server (SSH keys + credential store + gh CLI)
-5. `setup-jira.sh` — validate Jira connection (Cloud v3 or DC v2 API)
-6. `clone-repos.sh` — clone repos with auth_method-based URL construction, SSL config, per-repo git identity, branch-scoped cloning
-7. `setup-claude-config.sh` — cascade host → built-in → per-repo config
-8. Create `/workspace/.claude-session/` (status.json, output.log)
-9. If `ONE_SHOT_PROMPT` set → run `claude -p`, save output, exit; otherwise → `sleep infinity`
+5. `clone-repos.sh` — clone repos with auth_method-based URL construction, SSL config, per-repo git identity, branch-scoped cloning
+6. `setup-claude-config.sh` — cascade host → built-in → per-repo config
+7. Create `/workspace/.claude-session/` (status.json, output.log)
+8. If `ONE_SHOT_PROMPT` set → run `claude -p`, save output, exit; otherwise → `sleep infinity`
 
 ### Named Sessions
 
@@ -58,14 +57,6 @@ Sessions are isolated — multiple can run simultaneously. `stop` preserves the 
 - **SSH (key files)**: opt-in via `git_config.mount_ssh: true`. Mounts host `~/.ssh` read-only; SSH config generated per server with `IdentityFile` routing. Keys must not require a passphrase.
 
 `docker-compose.override.yaml` is generated at runtime by the CLI for conditional SSH/gitconfig/agent volume mounts (gitignored). Per-server identity and SSL config are handled the same way regardless of auth method.
-
-### Jira CLI
-
-Four read-only scripts in `jira-cli/` all source `jira-common.sh` for shared auth:
-- Cloud: `Basic base64(username:token)` → `/rest/api/3`
-- Datacenter: `Bearer token` → `/rest/api/2`
-
-`jira_curl()` handles auth headers, HTTP error codes, and JSON error extraction.
 
 ### Configuration Cascade
 
@@ -90,8 +81,6 @@ Per-repo config (`/host-config/repos/<name>/`) is copied to `/workspace/<name>/.
 | `scripts/entrypoint.sh` | Container init orchestrator |
 | `scripts/setup-git.sh` | Git auth: SSH config, credential store, gh CLI per server |
 | `docker-compose.override.yaml` | Generated at runtime by CLI for conditional SSH/gitconfig mounts (gitignored) |
-| `jira-cli/jira-common.sh` | Shared Jira auth/HTTP library |
-| `jira-cli/jira-*.sh` | Query scripts (get-issue, search, get-subtasks, get-sprint) |
 | `config/workspace.yaml` | User's GitHub servers + repos (gitignored) |
 | `.env` | User's credentials (gitignored) |
 

@@ -11,16 +11,6 @@ Use `gh` CLI for all GitHub operations:
 - `gh issue list` — list issues
 - `gh api <endpoint>` — raw API calls
 
-## Jira Integration (Read-Only)
-
-Use these CLI tools to understand user stories and issues:
-- `jira-get-issue PROJ-123` — fetch issue details (summary, status, description, subtasks)
-- `jira-search "project = PROJ AND status = 'In Progress'"` — search with JQL
-- `jira-get-subtasks PROJ-123` — list subtasks of a user story
-- `jira-get-sprint 42` — list issues in the active sprint for a board
-
-When a task references a Jira issue, always read it first to understand the full context.
-
 ## Workflow
 
 Use the gstack skills for structured development workflows:
@@ -40,7 +30,6 @@ Use the gstack skills for structured development workflows:
 - `/cso` — Security audit (OWASP + STRIDE)
 - `/benchmark` — Performance baselines and comparisons
 
-When a task references a Jira issue, always read it first to understand the full context.
 Commit with descriptive messages following project conventions.
 
 ## Superpowers Plugin

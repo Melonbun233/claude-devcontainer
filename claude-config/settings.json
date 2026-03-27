@@ -3,7 +3,6 @@
     "allow": [
       "Bash(git *)",
       "Bash(gh *)",
-      "Bash(jira-* *)",
       "Bash(curl *)",
       "Bash(jq *)",
       "Bash(python3 *)",
