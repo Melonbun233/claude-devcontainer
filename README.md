@@ -27,22 +27,6 @@ cp config/workspace.yaml.example config/workspace.yaml
 
 ## Built-in Skills & Plugins
 
-The container ships with two complementary skill sets pre-installed, available in all modes.
-
-### [gstack](https://github.com/garrytan/gstack) — Development Workflow Skills
-
-28 skills for day-to-day development. Key skills:
-
-| Skill | Purpose |
-|-------|---------|
-| `/review` | Staff engineer code review with bug detection and auto-fixes |
-| `/investigate` | Systematic root-cause debugging |
-| `/qa` | Real browser testing with regression tests |
-| `/ship` | Create PRs with test verification |
-| `/plan-eng-review` | Architecture and data flow review |
-| `/cso` | Security audit (OWASP + STRIDE) |
-| `/benchmark` | Performance baselines and comparisons |
-
 ### [superpowers](https://github.com/obra/superpowers) — Structured Development Methodology
 
 14 composable skills providing a complete software development workflow. Key skills:
@@ -64,7 +48,7 @@ Superpowers skills are automatically injected into every session via a SessionSt
 
 ### Develop (default)
 
-Interactive mode — you attach to the container and use Claude Code directly with full TTY formatting. All gstack and superpowers skills are available.
+Interactive mode — you attach to the container and use Claude Code directly with full TTY formatting. All superpowers skills are available.
 
 ```bash
 ./claude-sandbox start my-feature
@@ -77,7 +61,7 @@ Interactive mode — you attach to the container and use Claude Code directly wi
 
 ### PR Review
 
-One-shot mode — reviews a PR using gstack's `/review` skill and outputs comments.
+One-shot mode — reviews a PR and outputs comments.
 
 ```bash
 # Dry-run (default): outputs review to file for you to inspect
@@ -188,7 +172,7 @@ host-config/
         └── skills/
 ```
 
-The container ships with a built-in `CLAUDE.md` (GitHub, gstack, superpowers instructions) and `settings.json` (permissions allowlist). Your host config is layered on top:
+The container ships with a built-in `CLAUDE.md` (GitHub, superpowers instructions) and `settings.json` (permissions allowlist). Your host config is layered on top:
 - **CLAUDE.md**: host content is **appended** to the built-in (both are preserved)
 - **settings.json**: host values are **merged** with built-in defaults (host wins on conflicts)
 

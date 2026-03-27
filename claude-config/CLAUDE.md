@@ -13,22 +13,11 @@ Use `gh` CLI for all GitHub operations:
 
 ## Workflow
 
-Use the gstack skills for structured development workflows:
-
-1. **Plan**: `/office-hours` to frame the problem, `/plan-eng-review` to lock architecture
+1. **Plan**: Frame the problem, brainstorm, and plan architecture
 2. **Build**: Implement changes with focused, minimal edits
-3. **Review**: `/review` for pre-landing code review with auto-fixes
-4. **Test**: `/qa` for real browser testing, or run tests manually
-5. **Ship**: `/ship` to create PR with test verification
-
-### Key gstack skills available:
-- `/review` — Staff engineer code review with bug detection and auto-fixes
-- `/investigate` — Systematic root-cause debugging
-- `/qa` — Real browser testing with regression tests
-- `/ship` — Create PRs with test verification
-- `/plan-eng-review` — Architecture and data flow review
-- `/cso` — Security audit (OWASP + STRIDE)
-- `/benchmark` — Performance baselines and comparisons
+3. **Review**: Pre-landing code review
+4. **Test**: Run tests manually or via structured QA
+5. **Ship**: Create PR with test verification
 
 Commit with descriptive messages following project conventions.
 
