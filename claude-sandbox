@@ -5,6 +5,7 @@ set -euo pipefail
 
 COMPOSE="docker compose"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ORIGINAL_CWD="$(pwd)"
 
 cd "$SCRIPT_DIR"
 
@@ -276,6 +277,7 @@ KEEP_SESSION="false"
 AUTO_REMOVE="false"
 SOURCE_DIRS=()
 DEFAULT_WORKDIR=""
+INSTALL_PREFIX=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -288,7 +290,7 @@ while [ $# -gt 0 ]; do
     --help|-h)       usage; exit 0 ;;
     --dir=*)         SOURCE_DIRS+=("${1#--dir=}") ;;
     --dir)           shift; [ -n "${1:-}" ] || { echo "ERROR: --dir requires a value"; exit 1; }; SOURCE_DIRS+=("$1") ;;
-    --prefix=*)      ;; # handled by install command
+    --prefix=*)      INSTALL_PREFIX="${1#--prefix=}" ;; # used by install command
     *)               echo "Unknown option: $1"; usage; exit 1 ;;
   esac
   shift
@@ -299,7 +301,7 @@ done
 if [[ "$COMMAND" =~ ^(launch|start|run)$ ]]; then
   # Default to CWD if no --dir flags
   if [ ${#SOURCE_DIRS[@]} -eq 0 ]; then
-    SOURCE_DIRS=("$(pwd)")
+    SOURCE_DIRS=("$ORIGINAL_CWD")
   fi
 
   # Resolve to absolute paths and validate
@@ -527,13 +529,7 @@ case "$COMMAND" in
     ;;
 
   install)
-    PREFIX="/usr/local/bin"
-    # Check for --prefix flag
-    for arg in "$@"; do
-      case "$arg" in
-        --prefix=*) PREFIX="${arg#--prefix=}" ;;
-      esac
-    done
+    PREFIX="${INSTALL_PREFIX:-/usr/local/bin}"
     SYMLINK_TARGET="$PREFIX/claude-sandbox"
     SCRIPT_PATH="$SCRIPT_DIR/claude-sandbox"
 
