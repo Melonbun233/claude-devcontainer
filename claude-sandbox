@@ -4,7 +4,17 @@ set -euo pipefail
 # ── claude-sandbox — CLI wrapper for claude-sandbox ──────────────────────────────
 
 COMPOSE="docker compose"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve symlinks to find the real script location (supports `install` symlink)
+_source="${BASH_SOURCE[0]}"
+while [ -L "$_source" ]; do
+  _dir="$(cd "$(dirname "$_source")" && pwd)"
+  _source="$(readlink "$_source")"
+  # If readlink returns a relative path, resolve it relative to the symlink dir
+  [[ "$_source" != /* ]] && _source="$_dir/$_source"
+done
+SCRIPT_DIR="$(cd "$(dirname "$_source")" && pwd)"
+unset _source _dir
+ORIGINAL_CWD="$(pwd)"
 
 cd "$SCRIPT_DIR"
 
@@ -16,10 +26,11 @@ A session name is required for all commands (except build, list, help).
 
 Commands:
   build                                Build the container image
-  launch <name> [options]              Start + attach in one step
-  start <name> [--dangerously-skip-permissions]    Start a new session
+  install [--prefix=<path>]               Install CLI globally (symlink)
+  launch <name> [--dir=<path>]... [opts]           Start + attach in one step
+  start <name> [--dir=<path>]... [opts]            Start a new session
   attach <name> [--dangerously-skip-permissions]   Attach to a running session
-  run <name> --prompt=<text> [options] Run a one-shot prompt
+  run <name> --prompt=<text> [--dir=<path>]...     Run a one-shot prompt
   status <name>                        Show session status
   logs <name>                          Tail session output log
   stop <name>                          Stop session (can be restarted later)
@@ -44,6 +55,18 @@ Examples:
   claude-sandbox build
 EOF
       ;;
+    install)
+      cat <<'EOF'
+Usage: claude-sandbox install [--prefix=/usr/local/bin]
+
+Create a symlink so you can run 'claude-sandbox' from any directory.
+Default prefix is /usr/local/bin.
+
+Examples:
+  claude-sandbox install
+  claude-sandbox install --prefix=$HOME/.local/bin
+EOF
+      ;;
     launch)
       cat <<'EOF'
 Usage: claude-sandbox launch <session-name> [options]
@@ -54,9 +77,13 @@ is already running, you'll be prompted to re-attach or replace it.
 Options:
   --dangerously-skip-permissions    Run Claude without tool confirmation prompts
   --rm                  Auto-remove session when Claude exits
+  --dir=<path>          Source directory to copy into sandbox (repeatable)
+                        Defaults to current working directory if not specified
 
 Examples:
-  claude-sandbox launch my-feature
+  claude-sandbox launch my-feature                    # sandbox current directory
+  claude-sandbox launch my-feature --dir=~/repos/api  # sandbox a specific directory
+  claude-sandbox launch my-feature --dir=~/repos/api --dir=~/repos/config
   claude-sandbox launch my-feature --dangerously-skip-permissions
   claude-sandbox launch my-feature --rm
 EOF
@@ -70,12 +97,16 @@ container and persistent workspace volume.
 
 Options:
   --dangerously-skip-permissions    Run Claude without tool confirmation prompts
+  --dir=<path>          Source directory to copy into sandbox (repeatable)
+                        Defaults to current working directory if not specified
 
 If the session was previously stopped, it is restarted with its existing
 workspace data intact.
 
 Examples:
-  claude-sandbox start my-feature
+  claude-sandbox start my-feature                    # sandbox current directory
+  claude-sandbox start my-feature --dir=~/repos/api  # sandbox a specific directory
+  claude-sandbox start my-feature --dir=~/repos/api --dir=~/repos/config
   claude-sandbox start my-feature --dangerously-skip-permissions
 EOF
       ;;
@@ -108,9 +139,13 @@ Options:
   --pr=<ref>            PR review shorthand: number or org/repo#number
   --post                Post PR review to GitHub after completion
   --keep                Preserve session for later inspection (default: auto-remove)
+  --dir=<path>          Source directory to copy into sandbox (repeatable)
+                        Defaults to current working directory if not specified
 
 Examples:
   claude-sandbox run task1 --prompt "Respond with only: test successful"
+  claude-sandbox run task1 --prompt "Run tests" --dir=~/repos/api
+  claude-sandbox run task1 --prompt "Run tests" --dir=~/repos/api --dir=~/repos/config
   claude-sandbox run review1 --pr=123
   claude-sandbox run review2 --pr=org/repo#456 --post
   claude-sandbox run review3 --pr=123 --keep
@@ -154,7 +189,7 @@ EOF
 Usage: claude-sandbox delete <session-name>
 
 Permanently remove a session's container and workspace volume. This
-cannot be undone — all cloned repos and session data are lost.
+cannot be undone — all workspace files and session data are lost.
 
 Examples:
   claude-sandbox delete my-feature
@@ -200,7 +235,7 @@ shift || true
 
 # Commands that don't need a session name
 case "$COMMAND" in
-  build|list|"")
+  build|list|install|"")
     # handled below without session name
     ;;
   help|--help|-h)
@@ -249,6 +284,9 @@ PROMPT_ARG=""
 POST_REVIEW="false"
 KEEP_SESSION="false"
 AUTO_REMOVE="false"
+SOURCE_DIRS=()
+DEFAULT_WORKDIR=""
+INSTALL_PREFIX=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -259,10 +297,56 @@ while [ $# -gt 0 ]; do
     --rm)            AUTO_REMOVE="true" ;;
     --dangerously-skip-permissions) SKIP_PERMISSIONS="true" ;;
     --help|-h)       usage; exit 0 ;;
+    --dir=*)         SOURCE_DIRS+=("${1#--dir=}") ;;
+    --dir)           shift; [ -n "${1:-}" ] || { echo "ERROR: --dir requires a value"; exit 1; }; SOURCE_DIRS+=("$1") ;;
+    --prefix=*)      INSTALL_PREFIX="${1#--prefix=}" ;; # used by install command
     *)               echo "Unknown option: $1"; usage; exit 1 ;;
   esac
   shift
 done
+
+# ── Resolve source directories ───────────────────────────────────────────────
+# Only for commands that create sessions (launch, start, run)
+if [[ "$COMMAND" =~ ^(launch|start|run)$ ]]; then
+  # Default to CWD if no --dir flags
+  if [ ${#SOURCE_DIRS[@]} -eq 0 ]; then
+    SOURCE_DIRS=("$ORIGINAL_CWD")
+  fi
+
+  # Resolve to absolute paths and validate
+  RESOLVED_DIRS=()
+  BASENAMES=()
+  for dir in "${SOURCE_DIRS[@]}"; do
+    # Expand leading ~ to $HOME (shell doesn't expand tilde inside --dir=~/...)
+    [[ "$dir" == "~/"* ]] && dir="$HOME/${dir#\~/}"
+    [[ "$dir" == "~" ]] && dir="$HOME"
+    abs_dir="$(cd "$dir" 2>/dev/null && pwd)" || {
+      echo "ERROR: Directory does not exist: $dir"
+      exit 1
+    }
+    if [ -z "$(ls -A "$abs_dir" 2>/dev/null)" ]; then
+      echo "ERROR: Directory is empty: $abs_dir"
+      exit 1
+    fi
+    bname=$(basename "$abs_dir")
+    # Check for basename collisions
+    for existing in "${BASENAMES[@]+"${BASENAMES[@]}"}"; do
+      if [ "$existing" = "$bname" ]; then
+        echo "ERROR: Basename collision — two directories named '$bname'."
+        echo "  Rename one of them, or use a parent directory."
+        exit 1
+      fi
+    done
+    BASENAMES+=("$bname")
+    RESOLVED_DIRS+=("${abs_dir}:${bname}")
+  done
+  SOURCE_DIRS=("${RESOLVED_DIRS[@]}")
+
+  # Compute DEFAULT_WORKDIR (first dir's basename)
+  first_bname="${SOURCE_DIRS[0]##*:}"
+  DEFAULT_WORKDIR="/workspace/${first_bname}"
+  export DEFAULT_WORKDIR
+fi
 
 # ── Helper: check if container exists / is running ──────────────────────────
 container_exists() {
@@ -286,44 +370,47 @@ print_session_exit_message() {
     launch|attach)
       echo ":: Session '$session_name' is still running."
       echo ""
-      echo "  Re-attach:  ./claude-sandbox attach $session_name"
-      echo "  Stop:       ./claude-sandbox stop $session_name"
-      echo "  Delete:     ./claude-sandbox delete $session_name"
+      echo "  Re-attach:  claude-sandbox attach $session_name"
+      echo "  Stop:       claude-sandbox stop $session_name"
+      echo "  Delete:     claude-sandbox delete $session_name"
       ;;
     run-keep)
       echo ":: Session '$session_name' has been preserved (--keep)."
       echo ""
-      echo "  Re-attach:  ./claude-sandbox start $session_name && ./claude-sandbox attach $session_name"
-      echo "  Delete:     ./claude-sandbox delete $session_name"
+      echo "  Re-attach:  claude-sandbox start $session_name && claude-sandbox attach $session_name"
+      echo "  Delete:     claude-sandbox delete $session_name"
       ;;
   esac
   echo "─────────────────────────────────────────────"
 }
 
-# ── Generate docker-compose.override.yaml from workspace.yaml git_config ────
+# ── Generate docker-compose.override.yaml from sandbox.yaml git_config ───────
 generate_compose_override() {
-  local CONFIG_FILE="$SCRIPT_DIR/config/workspace.yaml"
+  local CONFIG_FILE=""
+  if [ -f "$SCRIPT_DIR/config/sandbox.yaml" ]; then
+    CONFIG_FILE="$SCRIPT_DIR/config/sandbox.yaml"
+  elif [ -f "$SCRIPT_DIR/config/workspace.yaml" ]; then
+    echo "NOTE: workspace.yaml is deprecated. Rename to sandbox.yaml and remove the repos[] section."
+    CONFIG_FILE="$SCRIPT_DIR/config/workspace.yaml"
+  fi
   local OVERRIDE_FILE="$SCRIPT_DIR/docker-compose.override.yaml"
 
-  # If no workspace.yaml, remove any stale override and return
-  if [ ! -f "$CONFIG_FILE" ]; then
-    rm -f "$OVERRIDE_FILE"
-    return 0
-  fi
+  # If no config file, skip SSH/gitconfig validation but continue for source dirs
+  local MOUNT_SSH="false"
+  local MOUNT_GITCONFIG="false"
+  local SSH_AGENT="false"
 
-  # yq is required to parse workspace.yaml
-  if ! command -v yq &>/dev/null; then
-    echo "ERROR: 'yq' is required but not found on this machine."
-    echo "  Install: brew install yq (macOS) or see https://github.com/mikefarah/yq"
-    return 1
-  fi
+  if [ -n "$CONFIG_FILE" ]; then
+    # yq is required to parse sandbox.yaml
+    if ! command -v yq &>/dev/null; then
+      echo "ERROR: 'yq' is required but not found on this machine."
+      echo "  Install: brew install yq (macOS) or see https://github.com/mikefarah/yq"
+      return 1
+    fi
 
-  local MOUNT_SSH
-  local MOUNT_GITCONFIG
-  MOUNT_SSH=$(yq '.git_config.mount_ssh // false' "$CONFIG_FILE" 2>/dev/null)
-  MOUNT_GITCONFIG=$(yq '.git_config.mount_gitconfig // false' "$CONFIG_FILE" 2>/dev/null)
-  local SSH_AGENT
-  SSH_AGENT=$(yq '.git_config.ssh_agent // false' "$CONFIG_FILE" 2>/dev/null)
+    MOUNT_SSH=$(yq '.git_config.mount_ssh // false' "$CONFIG_FILE" 2>/dev/null)
+    MOUNT_GITCONFIG=$(yq '.git_config.mount_gitconfig // false' "$CONFIG_FILE" 2>/dev/null)
+    SSH_AGENT=$(yq '.git_config.ssh_agent // false' "$CONFIG_FILE" 2>/dev/null)
 
   # Validate: any server with auth_method: ssh requires mount_ssh: true
   local SERVER_COUNT
@@ -336,7 +423,7 @@ generate_compose_override() {
     if [ "$AUTH_METHOD" = "ssh" ] && [ "$MOUNT_SSH" != "true" ] && [ "$SSH_AGENT" != "true" ]; then
       echo "ERROR: Server '$HOST' uses auth_method: ssh but neither git_config.mount_ssh nor git_config.ssh_agent is enabled."
       echo ""
-      echo "  Add one of these to config/workspace.yaml:"
+      echo "  Add one of these to config/sandbox.yaml:"
       echo "    git_config:"
       echo "      ssh_agent: true      # recommended: forward host SSH agent"
       echo "      mount_ssh: true      # alternative: mount key files"
@@ -391,27 +478,44 @@ generate_compose_override() {
     fi
   fi
 
-  # Generate override file if mounts or agent forwarding are needed
+  fi  # end if [ -n "$CONFIG_FILE" ]
+
+  # Determine if override file is needed
+  local NEED_OVERRIDE="false"
   if [ "$MOUNT_SSH" = "true" ] || [ "$MOUNT_GITCONFIG" = "true" ] || [ "$SSH_AGENT" = "true" ]; then
+    NEED_OVERRIDE="true"
+  fi
+  if [ -n "${DEFAULT_WORKDIR:-}" ]; then
+    NEED_OVERRIDE="true"
+  fi
+
+  if [ "$NEED_OVERRIDE" = "true" ]; then
     local NEED_ENV="false"
     {
       echo "# Generated by claude-sandbox — do not edit"
       echo "services:"
       echo "  claude-sandbox:"
-      echo "    volumes:"
-      if [ "$MOUNT_SSH" = "true" ]; then
-        echo "      - ${HOME}/.ssh:/home/claude/.ssh:ro"
+      if [ "$MOUNT_SSH" = "true" ] || [ "$MOUNT_GITCONFIG" = "true" ] || [ "$SSH_AGENT" = "true" ]; then
+        echo "    volumes:"
+        if [ "$MOUNT_SSH" = "true" ]; then
+          echo "      - ${HOME}/.ssh:/home/claude/.ssh:ro"
+        fi
+        if [ "$MOUNT_GITCONFIG" = "true" ]; then
+          echo "      - ${HOME}/.gitconfig:/home/claude/.gitconfig.host:ro"
+        fi
+        if [ "$SSH_AGENT" = "true" ]; then
+          echo "      - \"${SSH_AUTH_SOCK}:/run/ssh-agent.sock\""
+          NEED_ENV="true"
+        fi
       fi
-      if [ "$MOUNT_GITCONFIG" = "true" ]; then
-        echo "      - ${HOME}/.gitconfig:/home/claude/.gitconfig.host:ro"
-      fi
-      if [ "$SSH_AGENT" = "true" ]; then
-        echo "      - \"${SSH_AUTH_SOCK}:/run/ssh-agent.sock\""
-        NEED_ENV="true"
-      fi
-      if [ "$NEED_ENV" = "true" ]; then
+      if [ "$NEED_ENV" = "true" ] || [ -n "${DEFAULT_WORKDIR:-}" ]; then
         echo "    environment:"
-        echo "      - SSH_AUTH_SOCK=/run/ssh-agent.sock"
+        if [ "$NEED_ENV" = "true" ]; then
+          echo "      - SSH_AUTH_SOCK=/run/ssh-agent.sock"
+        fi
+        if [ -n "${DEFAULT_WORKDIR:-}" ]; then
+          echo "      - DEFAULT_WORKDIR=${DEFAULT_WORKDIR}"
+        fi
       fi
     } > "$OVERRIDE_FILE"
   else
@@ -420,11 +524,87 @@ generate_compose_override() {
   fi
 }
 
+# ── Copy source directories into running container via docker cp ─────────────
+copy_source_dirs() {
+  if [ ${#SOURCE_DIRS[@]} -eq 0 ]; then
+    # No source dirs — signal copy-done immediately so entrypoint proceeds
+    docker exec "$CONTAINER_NAME" touch /workspace/.claude-session/copy-done 2>/dev/null || true
+    return 0
+  fi
+
+  # Wait for entrypoint to signal it's ready for copy
+  local COPY_READY_TIMEOUT=60
+  for i in $(seq 1 "$COPY_READY_TIMEOUT"); do
+    if docker exec "$CONTAINER_NAME" test -f /workspace/.claude-session/copy-ready 2>/dev/null; then
+      break
+    fi
+    if ! container_running; then
+      echo "ERROR: Container stopped before copy could begin."
+      return 1
+    fi
+    sleep 1
+  done
+
+  if ! docker exec "$CONTAINER_NAME" test -f /workspace/.claude-session/copy-ready 2>/dev/null; then
+    echo "ERROR: Container did not signal copy-ready within ${COPY_READY_TIMEOUT}s."
+    return 1
+  fi
+
+  echo ":: Copying source directories into container..."
+
+  # docker cp each source directory
+  for entry in "${SOURCE_DIRS[@]}"; do
+    local host_path="${entry%%:*}"
+    local bname="${entry##*:}"
+    # Skip if directory already exists in workspace (restart case)
+    if docker exec "$CONTAINER_NAME" test -d "/workspace/$bname" 2>/dev/null; then
+      echo "  /workspace/$bname already exists, skipping copy"
+      continue
+    fi
+    echo "  Copying $bname to container:/workspace/$bname ..."
+    docker cp "$host_path/." "$CONTAINER_NAME:/workspace/$bname" || {
+      echo "ERROR: Failed to copy $bname"
+      return 1
+    }
+  done
+
+  # Fix ownership (docker cp creates files as root) and signal completion
+  docker exec -u root "$CONTAINER_NAME" chown -R claude:claude /workspace/
+  docker exec "$CONTAINER_NAME" touch /workspace/.claude-session/copy-done
+  echo " ✔ Source directories copied"
+}
+
 # ── Commands ─────────────────────────────────────────────────────────────────
 
 case "$COMMAND" in
   build)
     $COMPOSE build
+    ;;
+
+  install)
+    PREFIX="${INSTALL_PREFIX:-/usr/local/bin}"
+    SYMLINK_TARGET="$PREFIX/claude-sandbox"
+    SCRIPT_PATH="$SCRIPT_DIR/claude-sandbox"
+
+    if [ -L "$SYMLINK_TARGET" ]; then
+      echo "Symlink already exists at $SYMLINK_TARGET → $(readlink "$SYMLINK_TARGET")"
+      echo "Updating to point to $SCRIPT_PATH"
+      ln -sf "$SCRIPT_PATH" "$SYMLINK_TARGET"
+    elif [ -e "$SYMLINK_TARGET" ]; then
+      echo "ERROR: $SYMLINK_TARGET already exists and is not a symlink."
+      echo "  Remove it manually if you want to proceed."
+      exit 1
+    else
+      ln -s "$SCRIPT_PATH" "$SYMLINK_TARGET" 2>/dev/null || {
+        echo "Permission denied. Try:"
+        echo "  sudo claude-sandbox install"
+        echo "  claude-sandbox install --prefix=\$HOME/.local/bin"
+        exit 1
+      }
+    fi
+    echo "Installed: $SYMLINK_TARGET → $SCRIPT_PATH"
+    echo ""
+    echo "You can now run 'claude-sandbox' from any directory."
     ;;
 
   launch)
@@ -457,7 +637,8 @@ case "$COMMAND" in
       read -rp "Choice [r/d/q]: " choice
       case "$choice" in
         r|R)
-          DOCKER_CLI_HINTS=false docker exec -it "$CONTAINER_NAME" claude $CLAUDE_ARGS || true
+          REATTACH_WORKDIR=$(docker exec "$CONTAINER_NAME" printenv DEFAULT_WORKDIR 2>/dev/null || echo "/workspace")
+          DOCKER_CLI_HINTS=false docker exec -it -w "$REATTACH_WORKDIR" "$CONTAINER_NAME" claude $CLAUDE_ARGS || true
           if [ "$AUTO_REMOVE" = "true" ]; then
             print_session_exit_message "$SESSION_NAME" "launch-rm"
           else
@@ -499,7 +680,6 @@ case "$COMMAND" in
     fi
 
     # Wait for container to be running
-    echo ":: Waiting for container to start..."
     for i in $(seq 1 30); do
       if container_running; then
         break
@@ -511,6 +691,10 @@ case "$COMMAND" in
       echo "  Check logs: docker logs $CONTAINER_NAME"
       exit 1
     fi
+    echo " ✔ Container ready"
+
+    # Copy source directories into container via docker cp
+    copy_source_dirs || exit 1
 
     # Stream entrypoint output while waiting for setup to complete
     echo ""
@@ -560,7 +744,7 @@ case "$COMMAND" in
 
     echo ""
     echo ":: Attaching to session '$SESSION_NAME'..."
-    DOCKER_CLI_HINTS=false docker exec -it "$CONTAINER_NAME" claude $CLAUDE_ARGS || true
+    DOCKER_CLI_HINTS=false docker exec -it -w "${DEFAULT_WORKDIR:-/workspace}" "$CONTAINER_NAME" claude $CLAUDE_ARGS || true
     if [ "$AUTO_REMOVE" = "true" ]; then
       print_session_exit_message "$SESSION_NAME" "launch-rm"
     else
@@ -573,8 +757,8 @@ case "$COMMAND" in
     if container_running; then
       echo "ERROR: Session '$SESSION_NAME' is already running."
       echo ""
-      echo "  To attach:  ./claude-sandbox attach $SESSION_NAME"
-      echo "  To stop:    ./claude-sandbox stop $SESSION_NAME"
+      echo "  To attach:  claude-sandbox attach $SESSION_NAME"
+      echo "  To stop:    claude-sandbox stop $SESSION_NAME"
       exit 1
     fi
 
@@ -587,9 +771,12 @@ case "$COMMAND" in
       $COMPOSE up -d
     fi
 
+    # Copy source directories into container via docker cp
+    copy_source_dirs || exit 1
+
     echo ""
     echo "Session '$SESSION_NAME' started."
-    echo "Attach with:  ./claude-sandbox attach $SESSION_NAME"
+    echo "Attach with:  claude-sandbox attach $SESSION_NAME"
     ;;
 
   attach)
@@ -597,13 +784,13 @@ case "$COMMAND" in
       if container_exists; then
         echo "ERROR: Session '$SESSION_NAME' is stopped."
         echo ""
-        echo "  To restart: ./claude-sandbox start $SESSION_NAME"
+        echo "  To restart: claude-sandbox start $SESSION_NAME"
         exit 1
       else
         echo "ERROR: Session '$SESSION_NAME' does not exist."
         echo ""
-        echo "  To create:  ./claude-sandbox start $SESSION_NAME"
-        echo "  To list:    ./claude-sandbox list"
+        echo "  To create:  claude-sandbox start $SESSION_NAME"
+        echo "  To list:    claude-sandbox list"
         exit 1
       fi
     fi
@@ -611,7 +798,9 @@ case "$COMMAND" in
     if [ "$SKIP_PERMISSIONS" = "true" ]; then
       CLAUDE_ARGS="--dangerously-skip-permissions"
     fi
-    DOCKER_CLI_HINTS=false docker exec -it "$CONTAINER_NAME" claude $CLAUDE_ARGS || true
+    # Retrieve DEFAULT_WORKDIR from running container (may have been set at creation)
+    ATTACH_WORKDIR=$(docker exec "$CONTAINER_NAME" printenv DEFAULT_WORKDIR 2>/dev/null || echo "/workspace")
+    DOCKER_CLI_HINTS=false docker exec -it -w "$ATTACH_WORKDIR" "$CONTAINER_NAME" claude $CLAUDE_ARGS || true
     print_session_exit_message "$SESSION_NAME" "attach"
     ;;
 
@@ -632,8 +821,8 @@ case "$COMMAND" in
       echo "ERROR: --prompt=<text> or --pr=<ref> is required for run."
       echo ""
       echo "  Examples:"
-      echo "    ./claude-sandbox run $SESSION_NAME --prompt=\"Respond with: hello\""
-      echo "    ./claude-sandbox run $SESSION_NAME --pr=123"
+      echo "    claude-sandbox run $SESSION_NAME --prompt=\"Respond with: hello\""
+      echo "    claude-sandbox run $SESSION_NAME --pr=123"
       exit 1
     fi
 
@@ -646,9 +835,20 @@ case "$COMMAND" in
 
     export ONE_SHOT_PROMPT="$PROMPT"
 
-    # Run in foreground, blocks until container exits
+    # Start container detached, copy source dirs, then wait for completion
     generate_compose_override || exit 1
-    $COMPOSE up --abort-on-container-exit
+    $COMPOSE up -d
+
+    # Copy source directories via docker cp
+    copy_source_dirs || exit 1
+
+    # Stream logs and wait for container to finish (one-shot exits after prompt)
+    echo ""
+    docker logs -f "$CONTAINER_NAME" 2>&1 &
+    LOGS_PID=$!
+    docker wait "$CONTAINER_NAME" >/dev/null 2>&1 || true
+    kill "$LOGS_PID" 2>/dev/null || true
+    wait "$LOGS_PID" 2>/dev/null || true
 
     # Extract output using docker cp (container is stopped after --abort-on-container-exit)
     OUTPUT_FILE=$(mktemp)
@@ -687,8 +887,8 @@ case "$COMMAND" in
     else
       echo "Session '$SESSION_NAME' is stopped."
       echo ""
-      echo "  To restart: ./claude-sandbox start $SESSION_NAME"
-      echo "  To delete:  ./claude-sandbox delete $SESSION_NAME"
+      echo "  To restart: claude-sandbox start $SESSION_NAME"
+      echo "  To delete:  claude-sandbox delete $SESSION_NAME"
     fi
     ;;
 
@@ -708,15 +908,15 @@ case "$COMMAND" in
     docker stop "$CONTAINER_NAME" >/dev/null
     echo "Session '$SESSION_NAME' stopped."
     echo ""
-    echo "  To restart: ./claude-sandbox start $SESSION_NAME"
-    echo "  To delete:  ./claude-sandbox delete $SESSION_NAME"
+    echo "  To restart: claude-sandbox start $SESSION_NAME"
+    echo "  To delete:  claude-sandbox delete $SESSION_NAME"
     ;;
 
   delete)
     if ! container_exists; then
       echo "ERROR: Session '$SESSION_NAME' does not exist."
       echo ""
-      echo "  To list sessions: ./claude-sandbox list"
+      echo "  To list sessions: claude-sandbox list"
       exit 1
     fi
     # Stop if running
@@ -739,7 +939,7 @@ case "$COMMAND" in
     if [ "$COUNT" = "0" ]; then
       echo "  (no sessions)"
       echo ""
-      echo "  To start one: ./claude-sandbox start <session-name>"
+      echo "  To start one: claude-sandbox start <session-name>"
     else
       printf "  %-30s %s\n" "NAME" "STATUS"
       docker ps -a --filter "label=com.claude-sandbox.session=true" \

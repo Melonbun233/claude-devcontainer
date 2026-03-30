@@ -32,24 +32,3 @@ github_servers:
   #   user_name: Jane Doe
   #   user_email: jane.doe@corp.com
   #   ssl_verify: false
-
-# ── Repos to Clone ──────────────────────────────────────────────────────────
-# Each repo is cloned to /workspace/<target> on container start.
-# The URL host must match one of the github_servers above for auth.
-# Always use HTTPS URLs here — SSH conversion is automatic when
-# the matching server has auth_method: ssh.
-#
-# The 'branch' field is optional:
-#   - Set: only that branch is cloned (--single-branch), saving time/bandwidth
-#   - Omitted: the full repo with all branches is cloned
-repos: []
-  # - url: https://github.com/org/repo1
-  #   branch: main
-  #   target: repo1
-  #
-  # - url: https://github.enterprise.sap.com/team/service
-  #   branch: develop
-  #   target: service
-  #
-  # - url: https://github.com/org/docs
-  #   target: docs              # no branch — clones all branches

@@ -56,8 +56,73 @@ fi
 echo ":: Setting up Git..."
 /scripts/setup-git.sh || echo "WARN: Git setup had issues (continuing)"
 
-echo ":: Cloning repos..."
-/scripts/clone-repos.sh || echo "WARN: Repo cloning had issues (continuing)"
+echo ":: Waiting for source directories..."
+mkdir -p /workspace/.claude-session
+touch /workspace/.claude-session/copy-ready
+
+# Wait for host CLI to finish docker cp
+COPY_TIMEOUT=300
+for i in $(seq 1 "$COPY_TIMEOUT"); do
+  if [ -f /workspace/.claude-session/copy-done ]; then
+    break
+  fi
+  sleep 1
+done
+
+if [ -f /workspace/.claude-session/copy-done ]; then
+  echo "  Source directories copied to /workspace/"
+else
+  echo "  WARN: Source directory copy did not complete within ${COPY_TIMEOUT}s"
+fi
+
+echo ":: Setting up repo identities..."
+CONFIG_FILE=""
+if [ -f "/etc/claude-sandbox/config/sandbox.yaml" ]; then
+  CONFIG_FILE="/etc/claude-sandbox/config/sandbox.yaml"
+elif [ -f "/etc/claude-sandbox/config/workspace.yaml" ]; then
+  CONFIG_FILE="/etc/claude-sandbox/config/workspace.yaml"
+fi
+
+if [ -n "$CONFIG_FILE" ] && command -v yq &>/dev/null; then
+  # Build server identity maps
+  declare -A HOST_USER_NAMES HOST_USER_EMAILS
+  SERVER_COUNT=$(yq '.github_servers | length' "$CONFIG_FILE" 2>/dev/null || echo 0)
+  for i in $(seq 0 $((SERVER_COUNT - 1))); do
+    host=$(yq ".github_servers[$i].host" "$CONFIG_FILE")
+    uname=$(yq ".github_servers[$i].user_name // \"\"" "$CONFIG_FILE")
+    email=$(yq ".github_servers[$i].user_email // \"\"" "$CONFIG_FILE")
+    [ -n "$host" ] && HOST_USER_NAMES["$host"]="$uname"
+    [ -n "$host" ] && HOST_USER_EMAILS["$host"]="$email"
+  done
+
+  for repo in /workspace/*/; do
+    [ -d "$repo/.git" ] || continue
+    repo_path=$(realpath "$repo")
+
+    # Mark as safe directory
+    git config --global --add safe.directory "$repo_path"
+
+    # Match remote URL to a github_server for identity
+    remote_url=$(git -C "$repo_path" remote get-url origin 2>/dev/null || true)
+    if [ -n "$remote_url" ]; then
+      host=$(echo "$remote_url" | sed -E \
+        -e 's|^https?://([^/]+).*|\1|' \
+        -e 's|^[^@]+@([^:]+):.*|\1|')
+      user_name="${HOST_USER_NAMES[$host]:-}"
+      user_email="${HOST_USER_EMAILS[$host]:-}"
+      [ -n "$user_name" ] && git -C "$repo_path" config user.name "$user_name"
+      [ -n "$user_email" ] && git -C "$repo_path" config user.email "$user_email"
+    fi
+
+    echo "  $repo_path configured"
+  done
+else
+  # No config or no yq — still mark directories as safe
+  for repo in /workspace/*/; do
+    [ -d "$repo/.git" ] || continue
+    git config --global --add safe.directory "$(realpath "$repo")"
+  done
+fi
 
 echo ":: Configuring Claude Code..."
 /scripts/setup-claude-config.sh || echo "WARN: Claude config setup had issues (continuing)"
@@ -94,6 +159,10 @@ touch /workspace/.claude-session/ready
 # ── Dispatch ──────────────────────────────────────────────────────────────
 if [ -n "${ONE_SHOT_PROMPT:-}" ]; then
   echo ":: Running one-shot prompt..."
+  # Set working directory for Claude context
+  if [ -n "${DEFAULT_WORKDIR:-}" ] && [ -d "${DEFAULT_WORKDIR}" ]; then
+    cd "$DEFAULT_WORKDIR"
+  fi
   # One-shot always requires --dangerously-skip-permissions (non-interactive claude -p)
   OUTPUT=$(claude -p --dangerously-skip-permissions "$ONE_SHOT_PROMPT" 2>&1) || {
     echo "ERROR: Claude execution failed"

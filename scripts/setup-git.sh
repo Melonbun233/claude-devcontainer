@@ -5,7 +5,14 @@ set -euo pipefail
 # Replaces setup-github.sh. Handles both HTTPS (git-credential-store) and
 # SSH (key config + keyscan) per server, plus host gitconfig copying.
 
-CONFIG_FILE="/etc/claude-sandbox/config/workspace.yaml"
+if [ -f "/etc/claude-sandbox/config/sandbox.yaml" ]; then
+  CONFIG_FILE="/etc/claude-sandbox/config/sandbox.yaml"
+elif [ -f "/etc/claude-sandbox/config/workspace.yaml" ]; then
+  echo "  WARN: workspace.yaml is deprecated. Rename to sandbox.yaml."
+  CONFIG_FILE="/etc/claude-sandbox/config/workspace.yaml"
+else
+  CONFIG_FILE=""
+fi
 
 # ── Host gitconfig (runs first) ──────────────────────────────────────────────
 if [ -f "$HOME/.gitconfig.host" ]; then
@@ -26,8 +33,8 @@ else
   HOST_SSH_CONFIG=""
 fi
 
-if [ ! -f "$CONFIG_FILE" ]; then
-  echo "  No workspace.yaml found, skipping git setup."
+if [ -z "$CONFIG_FILE" ]; then
+  echo "  No sandbox.yaml found, skipping git setup."
   exit 0
 fi
 
