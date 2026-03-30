@@ -38,7 +38,7 @@ There is no test suite. Verify changes by building the image and starting a sess
 2. Copy + patch host `~/.claude.json` (pre-accept `/workspace` trust)
 3. Copy + rewrite host `~/.claude/settings.json` (`localhost` → `host.docker.internal`)
 4. `setup-git.sh` — authenticate git per server (SSH keys + credential store + gh CLI)
-5. Copy source directories from `/mnt/source/*` to `/workspace/*` (bind-mounted read-only by CLI)
+5. Host CLI copies source directories via `docker cp` (entrypoint handshake: copy-ready → copy-done)
 6. Per-repo git setup — `safe.directory`, per-repo identity from `github_servers[]`
 7. `setup-claude-config.sh` — cascade host → built-in → per-repo config
 8. Create `/workspace/.claude-session/` (status.json, output.log)
@@ -61,7 +61,7 @@ Sessions are isolated — multiple can run simultaneously. `stop` preserves the 
 - **SSH (agent forwarding)**: opt-in via `git_config.ssh_agent: true`. Forwards the host SSH agent socket into the container — recommended for passphrase-protected keys and macOS Keychain. See `docs/SSH-AGENT.md`.
 - **SSH (key files)**: opt-in via `git_config.mount_ssh: true`. Mounts host `~/.ssh` read-only; SSH config generated per server with `IdentityFile` routing. Keys must not require a passphrase.
 
-`docker-compose.override.yaml` is generated at runtime by the CLI for conditional SSH/gitconfig/agent volume mounts (gitignored). Per-server identity and SSL config are handled the same way regardless of auth method.
+`docker-compose.override.yaml` is generated at runtime by the CLI for conditional SSH/gitconfig/agent volume mounts and `DEFAULT_WORKDIR` (gitignored). Source directories are copied via `docker cp` after container start — no bind mounts. Per-server identity and SSL config are handled the same way regardless of auth method.
 
 ### Configuration Cascade
 
@@ -92,7 +92,7 @@ Per-repo config (`/host-config/repos/<name>/`) is copied to `/workspace/<name>/.
 ## Conventions
 
 - All setup scripts degrade gracefully: warn and continue if credentials are missing (`|| echo "WARN: ..."`)
-- Source directory copy errors don't abort remaining directories — each copy is wrapped in error handling
+- Source directories are copied via `docker cp` (no bind mounts) to avoid macOS virtiofs overhead
 - Token indirection: `sandbox.yaml` stores env var *names* (`token_env: GH_TOKEN`), resolved at runtime via `${!TOKEN_ENV}`
 - All `.env` variables auto-passed to container via `env_file` in docker-compose.yaml
 - Host proxy access: `host.docker.internal:host-gateway` in compose + `localhost` → `host.docker.internal` rewrite in entrypoint

@@ -4,6 +4,7 @@
 
 # Workspace config (user-specific, only examples committed)
 config/workspace.yaml
+config/sandbox.yaml
 
 # Custom CA certificates (user-specific)
 certs/

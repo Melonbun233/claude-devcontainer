@@ -56,21 +56,23 @@ fi
 echo ":: Setting up Git..."
 /scripts/setup-git.sh || echo "WARN: Git setup had issues (continuing)"
 
-echo ":: Copying source directories..."
-if [ -d /mnt/source ] && [ "$(ls -A /mnt/source 2>/dev/null)" ]; then
-  for src in /mnt/source/*/; do
-    dirname=$(basename "$src")
-    dest="/workspace/$dirname"
-    if [ -d "$dest" ]; then
-      echo "  /workspace/$dirname already exists, skipping copy"
-    else
-      echo "  Copying $dirname to /workspace/$dirname ..."
-      cp -a "$src" "$dest"
-      chown -R claude:claude "$dest" 2>/dev/null || true
-    fi
-  done
+echo ":: Waiting for source directories..."
+mkdir -p /workspace/.claude-session
+touch /workspace/.claude-session/copy-ready
+
+# Wait for host CLI to finish docker cp
+COPY_TIMEOUT=300
+for i in $(seq 1 "$COPY_TIMEOUT"); do
+  if [ -f /workspace/.claude-session/copy-done ]; then
+    break
+  fi
+  sleep 1
+done
+
+if [ -f /workspace/.claude-session/copy-done ]; then
+  echo "  Source directories copied to /workspace/"
 else
-  echo "  No source directories mounted at /mnt/source/, workspace will be empty"
+  echo "  WARN: Source directory copy did not complete within ${COPY_TIMEOUT}s"
 fi
 
 echo ":: Setting up repo identities..."
