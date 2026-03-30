@@ -531,7 +531,8 @@ case "$COMMAND" in
       read -rp "Choice [r/d/q]: " choice
       case "$choice" in
         r|R)
-          DOCKER_CLI_HINTS=false docker exec -it "$CONTAINER_NAME" claude $CLAUDE_ARGS || true
+          REATTACH_WORKDIR=$(docker exec "$CONTAINER_NAME" printenv DEFAULT_WORKDIR 2>/dev/null || echo "/workspace")
+          DOCKER_CLI_HINTS=false docker exec -it -w "$REATTACH_WORKDIR" "$CONTAINER_NAME" claude $CLAUDE_ARGS || true
           if [ "$AUTO_REMOVE" = "true" ]; then
             print_session_exit_message "$SESSION_NAME" "launch-rm"
           else
@@ -634,7 +635,7 @@ case "$COMMAND" in
 
     echo ""
     echo ":: Attaching to session '$SESSION_NAME'..."
-    DOCKER_CLI_HINTS=false docker exec -it "$CONTAINER_NAME" claude $CLAUDE_ARGS || true
+    DOCKER_CLI_HINTS=false docker exec -it -w "${DEFAULT_WORKDIR:-/workspace}" "$CONTAINER_NAME" claude $CLAUDE_ARGS || true
     if [ "$AUTO_REMOVE" = "true" ]; then
       print_session_exit_message "$SESSION_NAME" "launch-rm"
     else
@@ -685,7 +686,9 @@ case "$COMMAND" in
     if [ "$SKIP_PERMISSIONS" = "true" ]; then
       CLAUDE_ARGS="--dangerously-skip-permissions"
     fi
-    DOCKER_CLI_HINTS=false docker exec -it "$CONTAINER_NAME" claude $CLAUDE_ARGS || true
+    # Retrieve DEFAULT_WORKDIR from running container (may have been set at creation)
+    ATTACH_WORKDIR=$(docker exec "$CONTAINER_NAME" printenv DEFAULT_WORKDIR 2>/dev/null || echo "/workspace")
+    DOCKER_CLI_HINTS=false docker exec -it -w "$ATTACH_WORKDIR" "$CONTAINER_NAME" claude $CLAUDE_ARGS || true
     print_session_exit_message "$SESSION_NAME" "attach"
     ;;
 
