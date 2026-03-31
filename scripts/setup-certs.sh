@@ -25,8 +25,8 @@ for i in $(seq 0 $((SERVER_COUNT - 1))); do
   CERT_FILE="$CERTS_DIR/$CA_CERT"
 
   if [ ! -f "$CERT_FILE" ]; then
-    echo "  WARN: CA cert '$CA_CERT' for $HOST not found at $CERT_FILE"
-    continue
+    echo "  ERROR: CA cert '$CA_CERT' declared for $HOST but not found at $CERT_FILE"
+    exit 1
   fi
 
   # Copy to system CA store (filename must end in .crt)
