@@ -54,7 +54,7 @@ else
 fi
 
 echo ":: Setting up Git..."
-/scripts/setup-git.sh || echo "WARN: Git setup had issues (continuing)"
+/scripts/setup-git.sh
 
 echo ":: Waiting for source directories..."
 mkdir -p /workspace/.claude-session

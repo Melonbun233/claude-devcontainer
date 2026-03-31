@@ -86,13 +86,13 @@ for i in $(seq 0 $((SERVER_COUNT - 1))); do
   if [ "$AUTH_METHOD" = "https" ]; then
     # ── HTTPS server ──────────────────────────────────────────────────────
     if [ -z "$TOKEN_ENV" ]; then
-      echo "  WARN: No token_env defined for HTTPS server $HOST, skipping"
-      continue
+      echo "  ERROR: No token_env defined for HTTPS server $HOST"
+      exit 1
     fi
     TOKEN="${!TOKEN_ENV:-}"
     if [ -z "$TOKEN" ]; then
-      echo "  WARN: \$$TOKEN_ENV is not set, skipping $HOST"
-      continue
+      echo "  ERROR: \$$TOKEN_ENV is not set for server $HOST"
+      exit 1
     fi
 
     echo "  Configuring HTTPS credentials for $HOST..."
@@ -112,7 +112,8 @@ EOF
       echo "  Token written directly to gh hosts.yml (SSL verify off)"
     else
       (unset GH_TOKEN GH_ENTERPRISE_TOKEN; echo "$TOKEN" | gh auth login --hostname "$HOST" --with-token 2>&1) || {
-        echo "  WARN: Failed to authenticate gh CLI to $HOST"
+        echo "  ERROR: Failed to authenticate gh CLI to $HOST"
+        exit 1
       }
     fi
 
@@ -190,7 +191,8 @@ EOF
           }
         else
           (unset GH_TOKEN GH_ENTERPRISE_TOKEN; echo "$TOKEN" | gh auth login --hostname "$HOST" --with-token 2>&1) || {
-            echo "  WARN: Failed to authenticate gh CLI to $HOST"
+            echo "  ERROR: Failed to authenticate gh CLI to $HOST"
+            exit 1
           }
         fi
       fi
