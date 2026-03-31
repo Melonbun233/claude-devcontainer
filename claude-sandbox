@@ -27,10 +27,10 @@ A session name is required for all commands (except build, list, help).
 Commands:
   build                                Build the container image
   install [--prefix=<path>]               Install CLI globally (symlink)
-  launch <name> [--dir=<path>]... [opts]           Start + attach in one step
-  start <name> [--dir=<path>]... [opts]            Start a new session
+  launch <name> [--repo=<path>]... [opts]          Start + attach in one step
+  start <name> [--repo=<path>]... [opts]           Start a new session
   attach <name> [--dangerously-skip-permissions]   Attach to a running session
-  run <name> --prompt=<text> [--dir=<path>]...     Run a one-shot prompt
+  run <name> --prompt=<text> [--repo=<path>]...    Run a one-shot prompt
   status <name>                        Show session status
   logs <name>                          Tail session output log
   stop <name>                          Stop session (can be restarted later)
@@ -77,14 +77,17 @@ is already running, you'll be prompted to re-attach or replace it.
 Options:
   --dangerously-skip-permissions    Run Claude without tool confirmation prompts
   --rm                  Auto-remove session when Claude exits
-  --dir=<path>          Source directory to copy into sandbox (repeatable)
+  --repo=<path>[:<name>]  Source repo to copy into sandbox (repeatable)
                         Defaults to current working directory if not specified
+  --copy=<src>[:<dest>][:<mode>]  Copy file/dir into container (repeatable)
+                        dest defaults to same path, mode defaults to ro
 
 Examples:
-  claude-sandbox launch my-feature                    # sandbox current directory
-  claude-sandbox launch my-feature --dir=~/repos/api  # sandbox a specific directory
-  claude-sandbox launch my-feature --dir=~/repos/api --dir=~/repos/config
-  claude-sandbox launch my-feature --dangerously-skip-permissions
+  claude-sandbox launch my-feature
+  claude-sandbox launch my-feature --repo=~/repos/api
+  claude-sandbox launch my-feature --repo=~/repos/api --repo=~/repos/config
+  claude-sandbox launch my-feature --copy=~/.aws --copy=~/.kube/config
+  claude-sandbox launch my-feature --repo=~/repos/api:backend --copy=./env:/workspace/backend/.env:rw
   claude-sandbox launch my-feature --rm
 EOF
       ;;
@@ -97,17 +100,19 @@ container and persistent workspace volume.
 
 Options:
   --dangerously-skip-permissions    Run Claude without tool confirmation prompts
-  --dir=<path>          Source directory to copy into sandbox (repeatable)
+  --repo=<path>[:<name>]  Source repo to copy into sandbox (repeatable)
                         Defaults to current working directory if not specified
+  --copy=<src>[:<dest>][:<mode>]  Copy file/dir into container (repeatable)
+                        dest defaults to same path, mode defaults to ro
 
 If the session was previously stopped, it is restarted with its existing
 workspace data intact.
 
 Examples:
-  claude-sandbox start my-feature                    # sandbox current directory
-  claude-sandbox start my-feature --dir=~/repos/api  # sandbox a specific directory
-  claude-sandbox start my-feature --dir=~/repos/api --dir=~/repos/config
-  claude-sandbox start my-feature --dangerously-skip-permissions
+  claude-sandbox start my-feature
+  claude-sandbox start my-feature --repo=~/repos/api
+  claude-sandbox start my-feature --repo=~/repos/api --repo=~/repos/config
+  claude-sandbox start my-feature --copy=~/.aws --copy=~/.kube/config::rw
 EOF
       ;;
     attach)
@@ -139,16 +144,17 @@ Options:
   --pr=<ref>            PR review shorthand: number or org/repo#number
   --post                Post PR review to GitHub after completion
   --keep                Preserve session for later inspection (default: auto-remove)
-  --dir=<path>          Source directory to copy into sandbox (repeatable)
+  --repo=<path>[:<name>]  Source repo to copy into sandbox (repeatable)
                         Defaults to current working directory if not specified
+  --copy=<src>[:<dest>][:<mode>]  Copy file/dir into container (repeatable)
+                        dest defaults to same path, mode defaults to ro
 
 Examples:
   claude-sandbox run task1 --prompt "Respond with only: test successful"
-  claude-sandbox run task1 --prompt "Run tests" --dir=~/repos/api
-  claude-sandbox run task1 --prompt "Run tests" --dir=~/repos/api --dir=~/repos/config
+  claude-sandbox run task1 --prompt "Run tests" --repo=~/repos/api
+  claude-sandbox run task1 --prompt "Run tests" --repo=~/repos/api --copy=~/.aws
   claude-sandbox run review1 --pr=123
   claude-sandbox run review2 --pr=org/repo#456 --post
-  claude-sandbox run review3 --pr=123 --keep
 EOF
       ;;
     status)

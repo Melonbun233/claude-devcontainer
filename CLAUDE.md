@@ -12,13 +12,13 @@ Isolated, containerized Claude Code environment (`ubuntu:24.04`) for DevOps, dev
 ./claude-sandbox build                                    # docker compose build
 ./claude-sandbox install                                  # install CLI globally
 ./claude-sandbox launch <name>                            # sandbox current directory
-./claude-sandbox launch <name> --dir=/path/to/repo        # sandbox a specific directory
+./claude-sandbox launch <name> --repo=/path/to/repo       # sandbox a specific directory
 ./claude-sandbox launch <name> --rm                       # start + attach, auto-cleanup on exit
 ./claude-sandbox start <name>                             # start named session (required)
-./claude-sandbox start <name> --dir=/path/to/repo         # start with a specific directory
+./claude-sandbox start <name> --repo=/path/to/repo        # start with a specific directory
 ./claude-sandbox attach <name>                            # attach interactively
 ./claude-sandbox run <name> --prompt="<text>"             # run one-shot prompt
-./claude-sandbox run <name> --prompt="<text>" --dir=/path # run one-shot on a specific directory
+./claude-sandbox run <name> --prompt="<text>" --repo=/path # run one-shot on a specific directory
 ./claude-sandbox run <name> --pr=123                      # run PR review
 ./claude-sandbox stop <name>                              # stop (preserves state)
 ./claude-sandbox delete <name>                            # permanently remove container + volume
