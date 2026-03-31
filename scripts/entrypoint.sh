@@ -125,7 +125,7 @@ else
 fi
 
 echo ":: Configuring Claude Code..."
-/scripts/setup-claude-config.sh || echo "WARN: Claude config setup had issues (continuing)"
+/scripts/setup-claude-config.sh
 
 # ── Session directory ────────────────────────────────────────────────────────
 SESSION_DIR="/workspace/.claude-session"

@@ -56,14 +56,25 @@ if [ -d "$HOST_CONFIG" ]; then
   # Host agents (override built-in if same name)
   if [ -d "$HOST_CONFIG/agents" ]; then
     mkdir -p "$CLAUDE_HOME/agents"
-    cp "$HOST_CONFIG/agents/"*.md "$CLAUDE_HOME/agents/" 2>/dev/null || true
-    echo "  Copied host agents"
+    # Only copy if .md files exist; fail if cp itself fails
+    if compgen -G "$HOST_CONFIG/agents/*.md" > /dev/null; then
+      cp "$HOST_CONFIG/agents/"*.md "$CLAUDE_HOME/agents/" || {
+        echo "  ERROR: Failed to copy host agents"
+        exit 1
+      }
+      echo "  Copied host agents"
+    fi
   fi
 
   # Host skills (override built-in if same name)
   if [ -d "$HOST_CONFIG/skills" ]; then
-    cp -r "$HOST_CONFIG/skills/"* "$CLAUDE_HOME/skills/" 2>/dev/null || true
-    echo "  Copied host skills"
+    if compgen -G "$HOST_CONFIG/skills/*" > /dev/null; then
+      cp -r "$HOST_CONFIG/skills/"* "$CLAUDE_HOME/skills/" || {
+        echo "  ERROR: Failed to copy host skills"
+        exit 1
+      }
+      echo "  Copied host skills"
+    fi
   fi
 
 fi
@@ -90,18 +101,34 @@ if [ -d "$HOST_CONFIG/repos" ]; then
     # Per-repo agents
     if [ -d "$REPO_DIR/agents" ]; then
       mkdir -p "$WORKSPACE_REPO/.claude/agents"
-      cp "$REPO_DIR/agents/"*.md "$WORKSPACE_REPO/.claude/agents/" 2>/dev/null || true
+      if compgen -G "$REPO_DIR/agents/*.md" > /dev/null; then
+        cp "$REPO_DIR/agents/"*.md "$WORKSPACE_REPO/.claude/agents/" || {
+          echo "  ERROR: Failed to copy agents for $REPO_NAME"
+          exit 1
+        }
+      fi
     fi
 
     # Per-repo skills
     if [ -d "$REPO_DIR/skills" ]; then
-      cp -r "$REPO_DIR/skills/"* "$WORKSPACE_REPO/.claude/skills/" 2>/dev/null || true
+      mkdir -p "$WORKSPACE_REPO/.claude/skills"
+      if compgen -G "$REPO_DIR/skills/*" > /dev/null; then
+        cp -r "$REPO_DIR/skills/"* "$WORKSPACE_REPO/.claude/skills/" || {
+          echo "  ERROR: Failed to copy skills for $REPO_NAME"
+          exit 1
+        }
+      fi
     fi
 
     # Per-repo plans
     if [ -d "$REPO_DIR/plans" ]; then
       mkdir -p "$WORKSPACE_REPO/.claude/plans"
-      cp "$REPO_DIR/plans/"*.md "$WORKSPACE_REPO/.claude/plans/" 2>/dev/null || true
+      if compgen -G "$REPO_DIR/plans/*.md" > /dev/null; then
+        cp "$REPO_DIR/plans/"*.md "$WORKSPACE_REPO/.claude/plans/" || {
+          echo "  ERROR: Failed to copy plans for $REPO_NAME"
+          exit 1
+        }
+      fi
     fi
   done
 fi
