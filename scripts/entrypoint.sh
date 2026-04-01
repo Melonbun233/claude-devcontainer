@@ -127,6 +127,49 @@ fi
 echo ":: Configuring Claude Code..."
 /scripts/setup-claude-config.sh
 
+# ── Generate server documentation for Claude ────────────────────────────────
+if [ -n "$CONFIG_FILE" ] && command -v yq &>/dev/null; then
+  SERVER_COUNT=$(yq '.github_servers | length' "$CONFIG_FILE" 2>/dev/null || echo 0)
+  if [ "$SERVER_COUNT" -gt 0 ]; then
+    SSH_AGENT_ON="false"
+    [ -n "${SSH_AUTH_SOCK:-}" ] && SSH_AGENT_ON="true"
+    {
+      printf '\n\n---\n\n'
+      echo '## Configured Git Servers'
+      echo ''
+      echo '| Server | Auth | Clone Format | Notes |'
+      echo '|--------|------|--------------|-------|'
+      for i in $(seq 0 $((SERVER_COUNT - 1))); do
+        host=$(yq ".github_servers[$i].host" "$CONFIG_FILE")
+        auth=$(yq ".github_servers[$i].auth_method // \"https\"" "$CONFIG_FILE")
+        ssh_key=$(yq ".github_servers[$i].ssh_key // \"\"" "$CONFIG_FILE")
+        token_env=$(yq ".github_servers[$i].token_env // \"\"" "$CONFIG_FILE")
+        if [ "$auth" = "ssh" ]; then
+          clone="git@${host}:org/repo.git"
+          if [ -n "$ssh_key" ]; then
+            notes="key: $ssh_key"
+          elif [ "$SSH_AGENT_ON" = "true" ]; then
+            notes="agent forwarding"
+          else
+            notes=""
+          fi
+        else
+          clone="https://${host}/org/repo.git"
+          notes="token-based"
+        fi
+        [ -n "$token_env" ] && notes="${notes:+$notes, }gh CLI available"
+        echo "| ${host} | ${auth} | \`${clone}\` | ${notes} |"
+      done
+      echo ''
+      echo '**Important:** Always use the correct protocol for each server.'
+      echo '- **https** servers: use `https://` clone URLs'
+      echo '- **ssh** servers: use `git@host:org/repo.git` clone URLs'
+      echo '- Use `gh` CLI for PRs/issues. For enterprise: `gh --hostname <host> ...`'
+    } >> "$HOME/.claude/CLAUDE.md"
+    echo "  Server documentation appended to CLAUDE.md"
+  fi
+fi
+
 # ── Session directory ────────────────────────────────────────────────────────
 SESSION_DIR="/workspace/.claude-session"
 mkdir -p "$SESSION_DIR"
