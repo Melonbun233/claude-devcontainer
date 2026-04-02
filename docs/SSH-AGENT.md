@@ -77,10 +77,7 @@ The container automatically runs `ssh-keyscan` for each server in `github_server
 
 ## Platform Notes
 
-**macOS:** Docker Desktop for Mac runs containers inside a Linux VM. Socket forwarding works because Docker Desktop intercepts the host-side path and creates a proxy socket inside the VM. The proxied socket is mounted as `root:root 0660`; the container automatically fixes permissions (`chmod 666`) at startup so the non-root `claude` user can access it. If agent forwarding fails, test Docker socket forwarding:
-```bash
-docker run --rm -v ${SSH_AUTH_SOCK}:/run/test.sock alpine ls -la /run/test.sock
-```
+**macOS:** Docker Desktop for Mac runs containers inside a Linux VM. On macOS, the CLI automatically starts a `socat` relay at `~/.claude/ssh-agent.sock` to handle socket path rotation after sleep/wake (macOS launchd regenerates `SSH_AUTH_SOCK` paths). The container mounts this stable relay socket instead of the rotating path. Requires `socat` (`brew install socat`). The relay is restarted on each `start`/`launch` to pick up any new socket path.
 
 **Linux:** The host SSH agent socket must be accessible by UID 1000 (the container's `claude` user). If your host UID differs, adjust socket permissions.
 
@@ -100,4 +97,6 @@ docker run --rm -v ${SSH_AUTH_SOCK}:/run/test.sock alpine ls -la /run/test.sock
 | **"Permission denied" in debug logs despite agent working** | Normal when both `mount_ssh` and `ssh_agent` are enabled. SSH tries key files first (may fail), then agent succeeds. |
 | **Need `gh pr` on SSH-only server** | Add `token_env: GH_TOKEN` to the server config. `gh` CLI needs a PAT; git operations use SSH. |
 | **"Bad configuration option: usekeychain" inside container** | Your macOS `~/.ssh/config` contains `UseKeychain` or `AddKeysToAgent` which Linux doesn't support. Switch to `ssh_agent: true` (agent forwarding) instead of `mount_ssh: true` — agent forwarding doesn't mount the SSH config file, so macOS-only directives won't affect the container. Note: git operations already work (the container sanitizes the config for git via `core.sshCommand`), but direct `ssh` and `gh` CLI SSH connections read the mounted config and will fail. |
+| **SSH agent stops working after macOS sleep/wake** | The socat relay needs restarting after macOS rotates the SSH_AUTH_SOCK path. Run `claude-sandbox stop <name>` then `claude-sandbox start <name>` — the relay restarts automatically, and your workspace data is preserved. |
+| **"socat is required for SSH agent forwarding on macOS"** | Install socat: `brew install socat`. Required on macOS to handle SSH_AUTH_SOCK path rotation after sleep/wake. Not needed on Linux. |
 | **Security: can container use my keys?** | Yes. Agent forwarding lets any container process sign with your host keys (same as `ssh -A`). The container already runs with `--dangerously-skip-permissions`. |
