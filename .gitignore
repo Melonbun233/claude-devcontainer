@@ -2,9 +2,9 @@
 .env
 *.env.local
 
-# Workspace config (user-specific, only examples committed)
-config/workspace.yaml
+# Sandbox config (user-specific, only examples committed)
 config/sandbox.yaml
+config/workspace.yaml
 
 # Custom CA certificates (user-specific)
 certs/
