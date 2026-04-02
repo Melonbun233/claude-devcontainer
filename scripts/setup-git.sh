@@ -213,6 +213,12 @@ if [ -f "$HOME/.ssh-generated/known_hosts" ] || [ -f "$HOME/.ssh-generated/confi
     SSH_CMD="$SSH_CMD -F $HOST_SSH_CONFIG"
   fi
   git config --global core.sshCommand "$SSH_CMD"
+
+  # Make generated known_hosts available to direct ssh/gh commands (not just git)
+  if [ -f "$HOME/.ssh-generated/known_hosts" ] && [ ! -f "$HOME/.ssh/known_hosts" ]; then
+    mkdir -p "$HOME/.ssh"
+    ln -s "$HOME/.ssh-generated/known_hosts" "$HOME/.ssh/known_hosts"
+  fi
 fi
 
 # ── SSH agent verification ──────────────────────────────────────────────────
