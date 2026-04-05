@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Isolated, containerized Claude Code environment (`ubuntu:24.04`) for DevOps, developers, and CI/CD pipelines. Provides credential isolation, GitHub Enterprise multi-server auth, and pre-installed skills (superpowers).
+Isolated, containerized Claude Code environment (`ubuntu:24.04`) for DevOps, developers, and CI/CD pipelines. Provides credential isolation, GitHub Enterprise multi-server auth, and extensible skills/plugins.
 
 ## Build & Run
 
@@ -70,6 +70,8 @@ Built-in config (baked into image at `/etc/claude-sandbox/claude-config/`) is in
 - **CLAUDE.md**: host content **appended** to built-in (both preserved)
 - **settings.json**: host values **merged** via `jq -s '.[0] * .[1]'` (host wins)
 - **agents/skills**: host files override built-in if same name
+
+The built-in `settings.json` includes a `SessionStart` hook that prompts Claude to run `/reload-plugins` on startup, ensuring user-provided plugins are refreshed each session.
 
 Per-repo config (`/host-config/repos/<name>/`) is copied to `/workspace/<name>/.claude/`.
 

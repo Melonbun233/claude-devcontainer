@@ -1,6 +1,6 @@
 # claude-sandbox
 
-Isolated, containerized environment for Claude Code — built for DevOps, developers, and CI/CD pipelines. Ships with GitHub Enterprise multi-server auth, credential isolation, and pre-installed AI development skills.
+Isolated, containerized environment for Claude Code — built for DevOps, developers, and CI/CD pipelines. Ships with GitHub Enterprise multi-server auth, credential isolation, and extensible plugin support.
 
 ## Prerequisites
 
@@ -27,30 +27,11 @@ cp config/sandbox.yaml.example config/sandbox.yaml
 ./claude-sandbox launch my-feature
 ```
 
-## Built-in Skills & Plugins
-
-### [superpowers](https://github.com/obra/superpowers) — Structured Development Methodology
-
-14 composable skills providing a complete software development workflow. Key skills:
-
-| Skill | Purpose |
-|-------|---------|
-| `brainstorming` | Structured ideation before coding |
-| `test-driven-development` | Write tests first, then implement |
-| `systematic-debugging` | Methodical root-cause analysis |
-| `writing-plans` | Structured planning documents |
-| `executing-plans` | Step-by-step plan execution |
-| `requesting-code-review` | Request and manage code reviews |
-| `subagent-driven-development` | Parallel agent workflows |
-| `verification-before-completion` | Ensure quality gates pass |
-
-Superpowers skills are automatically injected into every session via a SessionStart hook.
-
 ## Modes
 
 ### Develop (default)
 
-Interactive mode — you attach to the container and use Claude Code directly with full TTY formatting. All superpowers skills are available.
+Interactive mode — you attach to the container and use Claude Code directly with full TTY formatting.
 
 ```bash
 ./claude-sandbox start my-feature
@@ -243,7 +224,7 @@ host-config/
         └── skills/
 ```
 
-The container ships with a built-in `CLAUDE.md` (GitHub, superpowers instructions) and `settings.json` (permissions allowlist). Your host config is layered on top:
+The container ships with a built-in `CLAUDE.md` (GitHub workflow instructions) and `settings.json` (permissions allowlist). Your host config is layered on top:
 - **CLAUDE.md**: host content is **appended** to the built-in (both are preserved)
 - **settings.json**: host values are **merged** with built-in defaults (host wins on conflicts)
 
