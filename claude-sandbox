@@ -862,8 +862,9 @@ qemu_is_registered() {
     return 0
   fi
   # Fallback: check inside Docker VM (macOS Docker Desktop)
+  # Use sh -c for glob expansion inside the container
   if [ ! -d /proc/sys/fs/binfmt_misc ]; then
-    if docker run --rm --privileged alpine ls /proc/sys/fs/binfmt_misc/qemu-* &>/dev/null 2>&1; then
+    if docker run --rm --privileged alpine sh -c 'ls /proc/sys/fs/binfmt_misc/qemu-* 2>/dev/null' &>/dev/null; then
       return 0
     fi
   fi
