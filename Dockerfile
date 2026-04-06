@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         sudo \
         buildah \
         skopeo \
+        crun \
         fuse-overlayfs \
         fuse3 \
         uidmap \
@@ -64,11 +65,14 @@ RUN mkdir -p /home/claude/.claude \
              /home/claude/.claude/skills \
              /home/claude/.claude/plugins \
              /home/claude/.config/containers \
+             /home/claude/.config/buildah \
              /home/claude/.local/share/containers
 
 # ── Rootless Buildah: container storage and registry config ───────────────
 COPY --chown=claude:claude containers-config/storage.conf /home/claude/.config/containers/storage.conf
 COPY --chown=claude:claude containers-config/registries.conf /home/claude/.config/containers/registries.conf
+COPY --chown=claude:claude containers-config/containers.conf /home/claude/.config/containers/containers.conf
+COPY --chown=claude:claude containers-config/buildah.conf /home/claude/.config/buildah/buildah.conf
 
 # ── superpowers (structured development workflow plugin) ─────────────────────
 RUN git clone https://github.com/obra/superpowers.git /home/claude/.claude/plugins/superpowers \
