@@ -8,7 +8,7 @@
 # Each entry defines a hostname and how to authenticate.
 #
 # auth_method: https (default) — uses PAT via git-credential-store
-# auth_method: ssh — uses SSH keys (requires git_config.ssh_agent or mount_ssh)
+# auth_method: ssh — uses SSH keys (requires git_config.mount_ssh: true)
 #
 # SSL options (for GitHub Enterprise with corporate/self-signed certs):
 #   ssl_verify: false     — skip TLS certificate verification
