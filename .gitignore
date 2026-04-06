@@ -35,6 +35,8 @@ docker-compose.override.yaml
 # Claude Code
 .claude/
 
+# Superpowers planning artifacts
+docs/superpowers/
 
 # Git worktrees
 .worktrees/
