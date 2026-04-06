@@ -608,7 +608,27 @@ generate_compose_override() {
 
     MOUNT_SSH=$(yq '.git_config.mount_ssh // false' "$CONFIG_FILE" 2>/dev/null)
     MOUNT_GITCONFIG=$(yq '.git_config.mount_gitconfig // false' "$CONFIG_FILE" 2>/dev/null)
-    SSH_AGENT=$(yq '.git_config.ssh_agent // false' "$CONFIG_FILE" 2>/dev/null)
+
+    # Detect deprecated ssh_agent config
+    local DEPRECATED_SSH_AGENT
+    DEPRECATED_SSH_AGENT=$(yq '.git_config.ssh_agent // false' "$CONFIG_FILE" 2>/dev/null)
+    if [ "$DEPRECATED_SSH_AGENT" = "true" ]; then
+      echo "ERROR: git_config.ssh_agent has been removed."
+      echo ""
+      echo "  SSH agent forwarding was unreliable on macOS (socket rotation after"
+      echo "  sleep/wake). Use one of these alternatives instead:"
+      echo ""
+      echo "  Option 1 — HTTPS + PAT (recommended):"
+      echo "    Remove ssh_agent: true from config/sandbox.yaml"
+      echo "    Set auth_method: https and token_env for each server"
+      echo ""
+      echo "  Option 2 — SSH key files (unencrypted keys only):"
+      echo "    Replace ssh_agent: true with mount_ssh: true"
+      echo "    Keys in ~/.ssh/ are mounted read-only into the container"
+      echo ""
+      echo "  See README.md for details."
+      return 1
+    fi
 
   # Validate: any server with auth_method: ssh requires mount_ssh: true
   local SERVER_COUNT
