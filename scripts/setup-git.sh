@@ -221,34 +221,6 @@ if [ -f "$HOME/.ssh-generated/known_hosts" ] || [ -f "$HOME/.ssh-generated/confi
   fi
 fi
 
-# ── SSH agent verification ──────────────────────────────────────────────────
-if [ -n "${SSH_AUTH_SOCK:-}" ]; then
-  echo "  Verifying SSH agent..."
-
-  # Fix socket permissions — Docker Desktop (macOS) mounts the proxied socket
-  # as root:root with 0660, which the non-root claude user cannot access.
-  if [ -S "$SSH_AUTH_SOCK" ] && [ ! -r "$SSH_AUTH_SOCK" ]; then
-    sudo chmod 666 "$SSH_AUTH_SOCK" 2>/dev/null || true
-  fi
-
-  set +e
-  ssh-add -l > /dev/null 2>&1
-  AGENT_EXIT=$?
-  set -e
-
-  if [ "$AGENT_EXIT" -eq 0 ]; then
-    KEY_COUNT=$(ssh-add -l 2>/dev/null | wc -l | tr -d ' ')
-    echo "  SSH agent forwarded successfully ($KEY_COUNT keys available)"
-  elif [ "$AGENT_EXIT" -eq 1 ]; then
-    echo "  WARN: SSH agent connected but no keys loaded."
-    echo "  If clone fails, run 'ssh-add' on the host to load your keys."
-  else
-    echo "  ERROR: SSH_AUTH_SOCK is set but agent is not responding."
-    echo "  Check that your host SSH agent is running: ssh-add -l"
-    exit 1
-  fi
-fi
-
 # Do NOT call `gh auth setup-git` here — it would overwrite the credential
 # helper chain (store + gh) established above. The gh CLI is already
 # authenticated per-server via hosts.yml / gh auth login.

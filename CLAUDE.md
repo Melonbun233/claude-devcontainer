@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Isolated, containerized Claude Code environment (`ubuntu:24.04`) for DevOps, developers, and CI/CD pipelines. Provides credential isolation, GitHub Enterprise multi-server auth, and pre-installed skills (superpowers).
+Isolated, containerized Claude Code environment (`ubuntu:24.04`) for DevOps, developers, and CI/CD pipelines. Provides credential isolation, GitHub Enterprise multi-server auth, and extensible skills/plugins.
 
 ## Build & Run
 
@@ -58,11 +58,10 @@ Sessions are isolated — multiple can run simultaneously. `stop` preserves the 
 
 `sandbox.yaml` defines a `github_servers[]` list. Each entry has `host`, `token_env` (env var name holding the PAT), `auth_method: ssh|https`, optional `user_name`/`user_email`, and optional SSL config (`ssl_verify: false` or `ca_cert: path`).
 
-- **HTTPS**: tokens written to git-credential-store; `gh` CLI configured as a secondary credential helper per server.
-- **SSH (agent forwarding)**: opt-in via `git_config.ssh_agent: true`. Forwards the host SSH agent socket into the container — recommended for passphrase-protected keys and macOS Keychain. On macOS, the CLI starts a `socat` relay at `~/.claude/ssh-agent.sock` to survive SSH_AUTH_SOCK path rotation after sleep/wake; requires `socat` (`brew install socat`).
+- **HTTPS** (recommended): tokens written to git-credential-store; `gh` CLI configured as a secondary credential helper per server.
 - **SSH (key files)**: opt-in via `git_config.mount_ssh: true`. Mounts host `~/.ssh` read-only; SSH config generated per server with `IdentityFile` routing. Keys must not require a passphrase.
 
-`docker-compose.override.yaml` is generated at runtime by the CLI for conditional SSH/gitconfig/agent volume mounts and `DEFAULT_WORKDIR` (gitignored). Source directories are copied via `docker cp` after container start — no bind mounts. Per-server identity and SSL config are handled the same way regardless of auth method.
+`docker-compose.override.yaml` is generated at runtime by the CLI for conditional SSH/gitconfig volume mounts and `DEFAULT_WORKDIR` (gitignored). Source directories are copied via `docker cp` after container start — no bind mounts. Per-server identity and SSL config are handled the same way regardless of auth method.
 
 ### Configuration Cascade
 
@@ -70,6 +69,8 @@ Built-in config (baked into image at `/etc/claude-sandbox/claude-config/`) is in
 - **CLAUDE.md**: host content **appended** to built-in (both preserved)
 - **settings.json**: host values **merged** via `jq -s '.[0] * .[1]'` (host wins)
 - **agents/skills**: host files override built-in if same name
+
+The built-in `settings.json` includes a `SessionStart` hook that prompts Claude to run `/reload-plugins` on startup, ensuring user-provided plugins are refreshed each session.
 
 Per-repo config (`/host-config/repos/<name>/`) is copied to `/workspace/<name>/.claude/`.
 

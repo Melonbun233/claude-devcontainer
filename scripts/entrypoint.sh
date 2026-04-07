@@ -131,8 +131,6 @@ echo ":: Configuring Claude Code..."
 if [ -n "$CONFIG_FILE" ] && command -v yq &>/dev/null; then
   SERVER_COUNT=$(yq '.github_servers | length' "$CONFIG_FILE" 2>/dev/null || echo 0)
   if [ "$SERVER_COUNT" -gt 0 ]; then
-    SSH_AGENT_ON="false"
-    [ -n "${SSH_AUTH_SOCK:-}" ] && SSH_AGENT_ON="true"
     {
       printf '\n\n---\n\n'
       echo '## Configured Git Servers'
@@ -148,10 +146,8 @@ if [ -n "$CONFIG_FILE" ] && command -v yq &>/dev/null; then
           clone="git@${host}:org/repo.git"
           if [ -n "$ssh_key" ]; then
             notes="key: $ssh_key"
-          elif [ "$SSH_AGENT_ON" = "true" ]; then
-            notes="agent forwarding"
           else
-            notes=""
+            notes="key-file mount"
           fi
         else
           clone="https://${host}/org/repo.git"

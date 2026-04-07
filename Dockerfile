@@ -58,10 +58,6 @@ RUN mkdir -p /home/claude/.claude \
              /home/claude/.claude/skills \
              /home/claude/.claude/plugins
 
-# ── superpowers (structured development workflow plugin) ─────────────────────
-RUN git clone https://github.com/obra/superpowers.git /home/claude/.claude/plugins/superpowers \
-    && rm -rf /home/claude/.claude/plugins/superpowers/.git \
-    && ln -s ../hooks/hooks.json /home/claude/.claude/plugins/superpowers/.claude-plugin/hooks.json
 
 USER root
 

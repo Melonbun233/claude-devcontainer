@@ -518,85 +518,6 @@ print_session_exit_message() {
   echo "─────────────────────────────────────────────"
 }
 
-# ── Ensure socat SSH agent relay is running (macOS only) ─────────────────────
-# Sets AGENT_SOCK to the relay path on macOS, or SSH_AUTH_SOCK on Linux.
-# On Linux this is a no-op (AGENT_SOCK = SSH_AUTH_SOCK).
-ensure_ssh_relay() {
-  AGENT_SOCK="${SSH_AUTH_SOCK:-}"
-
-  # Only needed on macOS — launchd rotates SSH_AUTH_SOCK paths after sleep/wake
-  [[ "$OSTYPE" == darwin* ]] || return 0
-
-  local RELAY_SOCK="$HOME/.claude/ssh-agent.sock"
-  local RELAY_PID_FILE="$HOME/.claude/ssh-agent-relay.pid"
-
-  if ! command -v socat &>/dev/null; then
-    echo "ERROR: 'socat' is required for SSH agent forwarding on macOS."
-    echo ""
-    echo "  Install with: brew install socat"
-    echo "  Then retry."
-    return 1
-  fi
-
-  if [ -z "${SSH_AUTH_SOCK:-}" ]; then
-    echo "ERROR: git_config.ssh_agent is true but SSH_AUTH_SOCK is not set."
-    echo ""
-    echo "  Start your SSH agent:"
-    echo "    eval \"\$(ssh-agent -s)\""
-    echo "    ssh-add"
-    return 1
-  fi
-
-  if [ ! -S "$SSH_AUTH_SOCK" ]; then
-    echo "ERROR: git_config.ssh_agent is true but SSH_AUTH_SOCK ($SSH_AUTH_SOCK) is not a valid socket."
-    echo ""
-    echo "  Verify your SSH agent is running: ssh-add -l"
-    return 1
-  fi
-
-  # Kill any existing relay (may point to stale socket after sleep/wake)
-  if [ -f "$RELAY_PID_FILE" ]; then
-    kill "$(cat "$RELAY_PID_FILE")" 2>/dev/null || true
-  fi
-  rm -f "$RELAY_SOCK" "$RELAY_PID_FILE"
-
-  mkdir -p "$HOME/.claude"
-  socat UNIX-LISTEN:"$RELAY_SOCK",fork UNIX-CONNECT:"$SSH_AUTH_SOCK" &
-  echo $! > "$RELAY_PID_FILE"
-
-  # Wait for relay socket to appear
-  for i in $(seq 1 10); do
-    [ -S "$RELAY_SOCK" ] && break
-    sleep 0.1
-  done
-
-  if [ ! -S "$RELAY_SOCK" ]; then
-    echo "ERROR: SSH agent relay failed to start."
-    echo "  Check that socat is working: socat -V"
-    return 1
-  fi
-
-  AGENT_SOCK="$RELAY_SOCK"
-  echo "  SSH agent relay started (PID $(cat "$RELAY_PID_FILE"))"
-}
-
-# ── Start SSH relay if ssh_agent is enabled in config ────────────────────────
-# Call this before docker start on the restart path (where generate_compose_override is skipped).
-maybe_start_ssh_relay() {
-  local CONFIG_FILE=""
-  if [ -f "$SCRIPT_DIR/config/sandbox.yaml" ]; then
-    CONFIG_FILE="$SCRIPT_DIR/config/sandbox.yaml"
-  elif [ -f "$SCRIPT_DIR/config/workspace.yaml" ]; then
-    CONFIG_FILE="$SCRIPT_DIR/config/workspace.yaml"
-  fi
-  [ -z "$CONFIG_FILE" ] && return 0
-
-  local SSH_AGENT
-  SSH_AGENT=$(yq '.git_config.ssh_agent // false' "$CONFIG_FILE" 2>/dev/null)
-  if [ "$SSH_AGENT" = "true" ]; then
-    ensure_ssh_relay || return 1
-  fi
-}
 
 # ── Generate docker-compose.override.yaml from sandbox.yaml git_config ───────
 generate_compose_override() {
@@ -612,7 +533,6 @@ generate_compose_override() {
   # If no config file, skip SSH/gitconfig validation but continue for source dirs
   local MOUNT_SSH="false"
   local MOUNT_GITCONFIG="false"
-  local SSH_AGENT="false"
   local CONTAINER_BUILDS="true"
 
   if [ -n "$CONFIG_FILE" ]; then
@@ -625,8 +545,28 @@ generate_compose_override() {
 
     MOUNT_SSH=$(yq '.git_config.mount_ssh // false' "$CONFIG_FILE" 2>/dev/null)
     MOUNT_GITCONFIG=$(yq '.git_config.mount_gitconfig // false' "$CONFIG_FILE" 2>/dev/null)
-    SSH_AGENT=$(yq '.git_config.ssh_agent // false' "$CONFIG_FILE" 2>/dev/null)
     CONTAINER_BUILDS=$(yq '.container_builds // true' "$CONFIG_FILE" 2>/dev/null)
+
+    # Detect deprecated ssh_agent config
+    local DEPRECATED_SSH_AGENT
+    DEPRECATED_SSH_AGENT=$(yq '.git_config.ssh_agent // false' "$CONFIG_FILE" 2>/dev/null)
+    if [ "$DEPRECATED_SSH_AGENT" = "true" ]; then
+      echo "ERROR: git_config.ssh_agent has been removed."
+      echo ""
+      echo "  SSH agent forwarding was unreliable on macOS (socket rotation after"
+      echo "  sleep/wake). Use one of these alternatives instead:"
+      echo ""
+      echo "  Option 1 — HTTPS + PAT (recommended):"
+      echo "    Remove ssh_agent: true from config/sandbox.yaml"
+      echo "    Set auth_method: https and token_env for each server"
+      echo ""
+      echo "  Option 2 — SSH key files (unencrypted keys only):"
+      echo "    Replace ssh_agent: true with mount_ssh: true"
+      echo "    Keys in ~/.ssh/ are mounted read-only into the container"
+      echo ""
+      echo "  See README.md for details."
+      return 1
+    fi
 
   # Validate: any server with auth_method: ssh requires mount_ssh: true
   local SERVER_COUNT
@@ -636,13 +576,12 @@ generate_compose_override() {
     AUTH_METHOD=$(yq ".github_servers[$i].auth_method // \"https\"" "$CONFIG_FILE")
     HOST=$(yq ".github_servers[$i].host" "$CONFIG_FILE")
 
-    if [ "$AUTH_METHOD" = "ssh" ] && [ "$MOUNT_SSH" != "true" ] && [ "$SSH_AGENT" != "true" ]; then
-      echo "ERROR: Server '$HOST' uses auth_method: ssh but neither git_config.mount_ssh nor git_config.ssh_agent is enabled."
+    if [ "$AUTH_METHOD" = "ssh" ] && [ "$MOUNT_SSH" != "true" ]; then
+      echo "ERROR: Server '$HOST' uses auth_method: ssh but git_config.mount_ssh is not enabled."
       echo ""
-      echo "  Add one of these to config/sandbox.yaml:"
+      echo "  Add this to config/sandbox.yaml:"
       echo "    git_config:"
-      echo "      ssh_agent: true      # recommended: forward host SSH agent"
-      echo "      mount_ssh: true      # alternative: mount key files"
+      echo "      mount_ssh: true      # mount host ~/.ssh/ read-only"
       return 1
     fi
 
@@ -675,16 +614,11 @@ generate_compose_override() {
     MOUNT_GITCONFIG="false"
   fi
 
-  # Start SSH agent relay (macOS) or set AGENT_SOCK directly (Linux)
-  if [ "$SSH_AGENT" = "true" ]; then
-    ensure_ssh_relay || return 1
-  fi
-
   fi  # end if [ -n "$CONFIG_FILE" ]
 
   # Determine if override file is needed
   local NEED_OVERRIDE="false"
-  if [ "$MOUNT_SSH" = "true" ] || [ "$MOUNT_GITCONFIG" = "true" ] || [ "$SSH_AGENT" = "true" ]; then
+  if [ "$MOUNT_SSH" = "true" ] || [ "$MOUNT_GITCONFIG" = "true" ]; then
     NEED_OVERRIDE="true"
   fi
   if [ -n "${DEFAULT_WORKDIR:-}" ]; then
@@ -695,7 +629,6 @@ generate_compose_override() {
   fi
 
   if [ "$NEED_OVERRIDE" = "true" ]; then
-    local NEED_ENV="false"
     {
       echo "# Generated by claude-sandbox — do not edit"
       echo "services:"
@@ -704,7 +637,7 @@ generate_compose_override() {
         echo "    security_opt:"
         echo "      - seccomp=unconfined"
       fi
-      if [ "$MOUNT_SSH" = "true" ] || [ "$MOUNT_GITCONFIG" = "true" ] || [ "$SSH_AGENT" = "true" ]; then
+      if [ "$MOUNT_SSH" = "true" ] || [ "$MOUNT_GITCONFIG" = "true" ]; then
         echo "    volumes:"
         if [ "$MOUNT_SSH" = "true" ]; then
           echo "      - ${HOME}/.ssh:/home/claude/.ssh:ro"
@@ -712,19 +645,10 @@ generate_compose_override() {
         if [ "$MOUNT_GITCONFIG" = "true" ]; then
           echo "      - ${HOME}/.gitconfig:/home/claude/.gitconfig.host:ro"
         fi
-        if [ "$SSH_AGENT" = "true" ]; then
-          echo "      - \"${AGENT_SOCK}:/run/ssh-agent.sock\""
-          NEED_ENV="true"
-        fi
       fi
-      if [ "$NEED_ENV" = "true" ] || [ -n "${DEFAULT_WORKDIR:-}" ]; then
+      if [ -n "${DEFAULT_WORKDIR:-}" ]; then
         echo "    environment:"
-        if [ "$NEED_ENV" = "true" ]; then
-          echo "      - SSH_AUTH_SOCK=/run/ssh-agent.sock"
-        fi
-        if [ -n "${DEFAULT_WORKDIR:-}" ]; then
-          echo "      - DEFAULT_WORKDIR=${DEFAULT_WORKDIR}"
-        fi
+        echo "      - DEFAULT_WORKDIR=${DEFAULT_WORKDIR}"
       fi
     } > "$OVERRIDE_FILE"
   else
@@ -1110,7 +1034,6 @@ case "$COMMAND" in
     # Restart stopped container or create new one
     if container_exists; then
       echo ":: Restarting stopped session '$SESSION_NAME'..."
-      maybe_start_ssh_relay || exit 1
       docker start "$CONTAINER_NAME"
     else
       echo ":: Creating session '$SESSION_NAME'..."
@@ -1206,7 +1129,6 @@ case "$COMMAND" in
     # Check if a stopped container exists — restart it
     if container_exists; then
       echo ":: Restarting stopped session '$SESSION_NAME'..."
-      maybe_start_ssh_relay || exit 1
       docker start "$CONTAINER_NAME"
     else
       maybe_prompt_qemu

@@ -16,5 +16,19 @@
       "Glob",
       "Grep"
     ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"Run /reload-plugins now to refresh all installed plugins and skills.\"}}'",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
   }
 }

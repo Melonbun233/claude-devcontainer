@@ -21,20 +21,6 @@ Use `gh` CLI for all GitHub operations:
 
 Commit with descriptive messages following project conventions.
 
-## Superpowers Plugin
-
-The [superpowers](https://github.com/obra/superpowers) plugin is installed globally, providing structured development workflows:
-- **Brainstorming** — structured ideation before coding
-- **Test-Driven Development** — write tests first, then implement
-- **Systematic Debugging** — methodical root-cause analysis
-- **Writing Plans** — structured planning documents
-- **Executing Plans** — step-by-step plan execution
-- **Code Review** — requesting and receiving reviews
-- **Subagent-Driven Development** — parallel agent workflows
-- **Verification Before Completion** — ensure quality gates pass
-
-Superpowers skills are invoked automatically during development tasks or via the Skill tool.
-
 ## Container Image Building
 
 This sandbox uses Buildah (daemonless, rootless) instead of Docker for building container images.
