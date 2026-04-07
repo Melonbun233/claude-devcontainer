@@ -737,7 +737,13 @@ copy_all_to_container() {
       break
     fi
     if ! container_running; then
+      local LOG_FILE="/tmp/claude-sandbox-${SESSION_NAME}-crash.log"
+      docker logs "$CONTAINER_NAME" > "$LOG_FILE" 2>&1
       echo "ERROR: Container stopped before copy could begin."
+      echo ""
+      cat "$LOG_FILE" | sed 's/^/    /'
+      echo ""
+      echo "  Full logs saved to: $LOG_FILE"
       return 1
     fi
     sleep 1
@@ -786,9 +792,10 @@ qemu_is_registered() {
     return 0
   fi
   # Fallback: check inside Docker VM (macOS Docker Desktop)
-  # Use sh -c for glob expansion inside the container
+  # The binfmt_misc pseudo-filesystem must be mounted before entries are visible
   if [ ! -d /proc/sys/fs/binfmt_misc ]; then
-    if docker run --rm --privileged alpine sh -c 'ls /proc/sys/fs/binfmt_misc/qemu-* 2>/dev/null' &>/dev/null; then
+    if docker run --rm --privileged alpine sh -c \
+      'mount -t binfmt_misc binfmt_misc /proc/sys/fs/binfmt_misc 2>/dev/null; ls /proc/sys/fs/binfmt_misc/qemu-* 2>/dev/null' &>/dev/null; then
       return 0
     fi
   fi
@@ -876,15 +883,15 @@ maybe_prompt_qemu() {
   BUILDS=$(read_container_builds)
   [ "$BUILDS" = "true" ] || return 0
 
+  # User suppressed the prompt — skip expensive detection entirely
+  local PROMPT_SETTING
+  PROMPT_SETTING=$(read_qemu_prompt)
+  [ "$PROMPT_SETTING" = "true" ] || return 0
+
   # Already registered — nothing to do
   if qemu_is_registered; then
     return 0
   fi
-
-  # User suppressed the prompt
-  local PROMPT_SETTING
-  PROMPT_SETTING=$(read_qemu_prompt)
-  [ "$PROMPT_SETTING" = "true" ] || return 0
 
   echo ""
   echo ":: Multi-architecture image builds"
@@ -1082,9 +1089,14 @@ case "$COMMAND" in
       fi
       if ! container_running; then
         cleanup_logs
+        local LOG_FILE="/tmp/claude-sandbox-${SESSION_NAME}-crash.log"
+        docker logs "$CONTAINER_NAME" > "$LOG_FILE" 2>&1
         echo ""
         echo "ERROR: Container stopped unexpectedly during setup."
-        echo "  Check logs: docker logs $CONTAINER_NAME"
+        echo ""
+        cat "$LOG_FILE" | sed 's/^/    /'
+        echo ""
+        echo "  Full logs saved to: $LOG_FILE"
         trap - EXIT
         exit 1
       fi
